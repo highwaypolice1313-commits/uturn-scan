@@ -23,6 +23,7 @@ canvas{max-width:100%;display:block;background:#000;border-radius:6px}#zc{cursor
 
 <section><h2>1. เลือกโฟลเดอร์ภาพและโมเดล</h2>
 <div class="row"><button id="pickDir" class="pri">เลือกโฟลเดอร์ภาพ</button><span id="dst" class="m">ยังไม่ได้เลือก</span></div>
+<div class="row"><button id="pickVid">หรือเลือกไฟล์วิดีโอ</button><label>ตรวจ <input type="number" id="vfps" value="5" min="1" max="30"> เฟรม/วินาที (วิดีโอเท่านั้น)</label></div>
 <div class="row"><input type="file" id="mf" accept=".onnx"><span id="mst" class="m">กำลังหาโมเดล yolov8n.onnx...</span></div></section>
 
 <section><h2>2. วาดโซน (คลิกวางจุดมุมบนภาพ · คลิกขวาลบจุดล่าสุด · ระบบจำโซนไว้)</h2>
@@ -53,25 +54,38 @@ canvas{max-width:100%;display:block;background:#000;border-radius:6px}#zc{cursor
 <button id="bs">ตั้งเป็นจุดเริ่ม ([)</button><button id="be">ตั้งเป็นจุดจบ (])</button></div>
 <div class="m">← → เลื่อนเฟรม · ↑ ↓ เปลี่ยนเหตุการณ์ · เส้นเขียวคือเส้นทางรถ กรอบส้มคือรถในเฟรมนั้น</div>
 </div></div>
-<div class="row"><button id="ex" class="pri" disabled>ส่งออกเหตุการณ์ที่ยืนยันแล้ว</button><span id="exs" class="m"></span></div></section>
+<div class="row"><label><input type="checkbox" id="exall"> ส่งออกทุกภาพในช่วง (ไม่ติ๊ก = เฉพาะภาพสำคัญ ประมาณ 5 ภาพ)</label><button id="ex" class="pri" disabled>ส่งออกเหตุการณ์ที่ยืนยันแล้ว</button><span id="exs" class="m"></span></div></section>
 </main>
 <script>
 const $=id=>document.getElementById(id);
 let files=[],session=null,zones=JSON.parse(localStorage.zones||'{}'),sample=null,drag=null,W=640,H=360,P={},stopF=false;
 let events=[],tracks=[],curBmp=null,cur=-1,fi=0;
 const zc=$('zc'),zx=zc.getContext('2d'),vc=$('vc'),vx=vc.getContext('2d');
-const getBmp=async i=>createImageBitmap(await files[i].getFile());
+let vid=null,vfn='',vN=0,VS=0.2; // โหมดวิดีโอ: ตรวจทุก VS วินาที
+const N=()=>vid?vN:files.length,pad=x=>String(x).padStart(2,'0');
+const fmtT=(t,sep=':')=>pad(Math.floor(t/3600))+sep+pad(Math.floor(t%3600/60))+sep+pad(Math.floor(t%60))+(sep==':'?'.':'_')+Math.floor(t*10%10);
+const nm=i=>vid?vfn+' '+fmtT(i*VS):files[i].name;
+const seek=t=>new Promise(r=>{t=Math.min(t,vid.duration-0.05);if(Math.abs(vid.currentTime-t)<1e-3)return r();vid.onseeked=()=>r();vid.currentTime=t});
+const getBmp=async i=>{if(!vid)return createImageBitmap(await files[i].getFile());await seek(i*VS);return createImageBitmap(vid)};
 const ang=(a,b)=>Math.acos(Math.max(-1,Math.min(1,(a[0]*b[0]+a[1]*b[1])/(Math.hypot(...a)*Math.hypot(...b)||1))))*180/Math.PI;
 
 // ---------- โหลดโฟลเดอร์ / โมเดล ----------
 $('pickDir').onclick=async()=>{
   if(!window.showDirectoryPicker)return alert('ต้องใช้ Chrome หรือ Edge');
-  const d=await showDirectoryPicker();files=[];
+  const d=await showDirectoryPicker();vid=null;files=[];
   for await(const [n,h] of d.entries())if(h.kind==='file'&&/\.(jpe?g|png|bmp|webp)$/i.test(n))files.push(h);
   files.sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true}));
-  $('dst').textContent=`${d.name} · ${files.length.toLocaleString()} ภาพ`;
-  $('ss').max=Math.max(0,files.length-1);$('ss').value=0;await showSample(0);gate();
+  $('dst').textContent=`${d.name} · ${N().toLocaleString()} ภาพ`;
+  $('ss').max=Math.max(0,N()-1);$('ss').value=0;await showSample(0);gate();
 };
+$('pickVid').onclick=async()=>{
+  if(!window.showOpenFilePicker)return alert('ต้องใช้ Chrome หรือ Edge');
+  const [h]=await showOpenFilePicker({types:[{description:'วิดีโอ',accept:{'video/*':['.mp4','.mov','.mkv','.webm','.m4v','.avi']}}]});
+  const f=await h.getFile(),v=document.createElement('video');v.muted=true;v.preload='auto';v.src=URL.createObjectURL(f);
+  try{await new Promise((r,j)=>{v.onloadedmetadata=r;v.onerror=()=>j()})}catch(e){return alert('เบราว์เซอร์เปิดวิดีโอนี้ไม่ได้ (รูปแบบ/โคเดกไม่รองรับ) ลองแปลงเป็น MP4 (H.264)')}
+  vid=v;vfn=f.name;files=[];VS=1/+$('vfps').value;vN=Math.floor(v.duration/VS);
+  $('dst').textContent=`${vfn} · ยาว ${fmtT(v.duration)} · จะตรวจ ${vN.toLocaleString()} เฟรม`;
+  $('ss').max=Math.max(0,vN-1);$('ss').value=0;await showSample(0);gate()};
 async function loadModel(buf){
   try{ort.env.wasm.wasmPaths='https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.1/dist/';
   session=await ort.InferenceSession.create(buf,{executionProviders:['wasm']});$('mst').textContent='โหลดโมเดลแล้ว ✓';gate()}
@@ -79,7 +93,7 @@ async function loadModel(buf){
 }
 fetch('yolov8n.onnx').then(r=>r.ok?r.arrayBuffer():Promise.reject()).then(loadModel).catch(()=>$('mst').textContent='เลือกไฟล์โมเดล .onnx (yolov8n)');
 $('mf').onchange=async e=>{if(e.target.files[0])loadModel(await e.target.files[0].arrayBuffer())};
-const gate=()=>$('run').disabled=!(files.length&&session);
+const gate=()=>$('run').disabled=!(N()&&session);
 
 // ---------- โซนกลับรถ ----------
 async function showSample(i){sample=await getBmp(i);W=sample.width;H=sample.height;zc.width=W;zc.height=H;drawZone()}
@@ -164,15 +178,16 @@ function live(bmp,i,dets,st){
   for(const k of['a','b']){const z=zones[k];if(z&&z.length>2){poly(lx,z,W,H);lx.strokeStyle=`rgba(${ZC[k]},.8)`;lx.setLineDash([8,6]);lx.stroke();lx.setLineDash([])}}
   lx.strokeStyle='#3fb950';for(const t of tracks){lx.beginPath();t.pts.forEach((p,k)=>k?lx.lineTo(p.cx,p.cy):lx.moveTo(p.cx,p.cy));lx.stroke()}
   lx.strokeStyle='#f5a524';for(const d of dets)lx.strokeRect(d.x1,d.y1,d.x2-d.x1,d.y2-d.y1);
-  $('lt').textContent=`ภาพ ${i+1}/${files.length} · ${files[i].name} · ${st}`}
+  $('lt').textContent=`ภาพ ${i+1}/${N()} · ${nm(i)} · ${st}`}
 
 // ---------- วนประมวลผลทุกภาพ ----------
-function readP(){P={conf:+$('conf').value,mot:+$('mot').value/1000,ang:+$('ang').value,pre:+$('pre').value,post:+$('post').value,all:$('all').checked,hang:8,lost:15,minPts:5}}
+function readP(){if(vid){VS=1/+$('vfps').value;vN=Math.floor(vid.duration/VS)}
+  P={conf:+$('conf').value,mot:+$('mot').value/1000,ang:+$('ang').value,pre:+$('pre').value,post:+$('post').value,all:$('all').checked,hang:8,lost:15,minPts:5}}
 $('stop').onclick=()=>stopF=true;
 $('run').onclick=async()=>{
   readP();stopF=false;events=[];tracks=[];cur=-1;renderList();
   $('run').disabled=true;$('stop').disabled=false;let prev=null,hang=0,det=0;const t0=performance.now();
-  for(let i=0;i<files.length&&!stopF;i++){
+  for(let i=0;i<N()&&!stopF;i++){
     const bmp=await getBmp(i);curBmp=bmp;
     smx.drawImage(bmp,0,0,80,45);const d=smx.getImageData(0,0,80,45).data,g=new Uint8Array(3600);
     for(let k=0;k<3600;k++)g[k]=(d[k*4]+d[k*4+1]+d[k*4+2])/3;
@@ -183,8 +198,8 @@ $('run').onclick=async()=>{
     if($('lvon').checked&&(dets.length||i%4==0)){live(bmp,i,dets,st);await new Promise(r=>setTimeout(r))}
     closeStale(i);bmp.close();
     if(i%10==0){const sec=(performance.now()-t0)/1000;
-      $('pt').textContent=`${i+1}/${files.length} · ตรวจรถ ${det} เฟรม · พบ ${events.length} เหตุการณ์ · ใช้เวลา ${sec.toFixed(0)} วิ`;
-      $('bar').firstChild.style.width=(i/files.length*100)+'%';await new Promise(r=>setTimeout(r))}
+      $('pt').textContent=`${i+1}/${N()} · ตรวจรถ ${det} เฟรม · พบ ${events.length} เหตุการณ์ · ใช้เวลา ${sec.toFixed(0)} วิ`;
+      $('bar').firstChild.style.width=(i/N()*100)+'%';await new Promise(r=>setTimeout(r))}
   }
   closeStale(0,true);events.sort((a,b)=>a.s-b.s);renderList();
   $('pt').textContent=(stopF?'หยุดแล้ว · ':'เสร็จแล้ว · ')+`พบ ${events.length} เหตุการณ์ที่น่าสงสัย`;
@@ -195,13 +210,13 @@ function renderList(){
   $('list').innerHTML=events.map((e,k)=>`<div class="ev ${k==cur?'sel ':''}${e.ok===true?'y':e.ok===false?'n':''}" onclick="sel(${k})">#${k+1} · ภาพ ${e.s+1}–${e.e+1} · ${e.ang?Math.round(e.ang)+'°':'A→B'}</div>`).join('')||'<div class="m">ยังไม่มีเหตุการณ์</div>';
   const y=events.filter(e=>e.ok).length;$('cnt').textContent=events.length?`(ยืนยัน ${y} / ${events.length})`:'';$('ex').disabled=!y}
 async function sel(k){cur=k;const e=events[k],sl=$('sl');
-  sl.min=Math.max(0,e.t[0].i-5);sl.max=Math.min(files.length-1,e.t[e.t.length-1].i+5);renderList();await show(e.s)}
+  sl.min=Math.max(0,e.t[0].i-5);sl.max=Math.min(N()-1,e.t[e.t.length-1].i+5);renderList();await show(e.s)}
 async function show(i){
   if(cur<0)return;fi=i;$('sl').value=i;const bmp=await getBmp(i),e=events[cur];
   vc.width=bmp.width;vc.height=bmp.height;vx.drawImage(bmp,0,0);bmp.close();
   vx.fillStyle='#3fb950';e.t.forEach(p=>{vx.beginPath();vx.arc(p.cx,p.cy,4,0,7);vx.fill()});
   const q=e.t.find(p=>p.i==i);if(q){vx.strokeStyle='#f5a524';vx.lineWidth=4;vx.strokeRect(q.b.x1,q.b.y1,q.b.x2-q.b.x1,q.b.y2-q.b.y1)}
-  $('info').textContent=`${files[i].name}${i==e.s?' · จุดเริ่ม':''}${i==e.e?' · จุดจบ (เห็นทะเบียน)':''} — ช่วง ${files[e.s].name} → ${files[e.e].name}`}
+  $('info').textContent=`${nm(i)}${i==e.s?' · จุดเริ่ม':''}${i==e.e?' · จุดจบ (เห็นทะเบียน)':''} — ช่วง ${nm(e.s)} → ${nm(e.e)}`}
 $('sl').oninput=e=>show(+e.target.value);
 function mark(v){if(cur<0)return;events[cur].ok=v;renderList();if(cur<events.length-1)sel(cur+1)}
 $('by').onclick=()=>mark(true);$('bn').onclick=()=>mark(false);
@@ -217,11 +232,19 @@ document.addEventListener('keydown',e=>{if(/INPUT/.test(e.target.tagName)&&e.tar
 
 // ---------- ส่งออก ----------
 $('ex').onclick=async()=>{
-  const out=await showDirectoryPicker({mode:'readwrite'}),ok=events.filter(e=>e.ok);let csv='\ufeffเหตุการณ์,ไฟล์เริ่ม,ไฟล์จบ,จำนวนภาพ\n';
-  for(let n=0;n<ok.length;n++){const e=ok[n],name='เหตุการณ์_'+String(n+1).padStart(3,'0');
-    const dir=await out.getDirectoryHandle(name,{create:true}),a=Math.max(0,e.s-P.pre),b=Math.min(files.length-1,e.e+P.post);
-    for(let i=a;i<=b;i++){const f=await files[i].getFile(),w=await(await dir.getFileHandle(f.name,{create:true})).createWritable();await w.write(f);await w.close()}
-    csv+=`${name},${files[a].name},${files[b].name},${b-a+1}\n`;$('exs').textContent=`ส่งออก ${n+1}/${ok.length}`}
+  const out=await showDirectoryPicker({mode:'readwrite'}),ok=events.filter(e=>e.ok),all=$('exall').checked;
+  let csv='\ufeffเหตุการณ์,จุดเริ่ม,จุดเห็นทะเบียน,จำนวนภาพ,ไฟล์ภาพเห็นทะเบียน\n';
+  for(let n=0;n<ok.length;n++){const e=ok[n],name='เหตุการณ์_'+pad(n+1).padStart(3,'0'),dir=await out.getDirectoryHandle(name,{create:true});
+    let idx=[];
+    if(all){for(let i=Math.max(0,e.s-P.pre);i<=Math.min(N()-1,e.e+P.post);i++)idx.push(i)}
+    else{const m=Math.min(5,e.e-e.s+1);for(let k=0;k<m;k++)idx.push(e.s+Math.round(k*(e.e-e.s)/Math.max(1,m-1)));idx=[...new Set(idx)]}
+    let plate='';
+    for(const i of idx){let fn,data;
+      if(vid){const b=await getBmp(i),c=document.createElement('canvas');c.width=b.width;c.height=b.height;c.getContext('2d').drawImage(b,0,0);b.close();
+        data=await new Promise(r=>c.toBlob(r,'image/jpeg',.95));fn=vfn.replace(/\.[^.]+$/,'')+'_'+fmtT(i*VS,'-')+(i==e.e?'_ทะเบียน':'')+'.jpg'}
+      else{data=await files[i].getFile();fn=(i==e.e?'ทะเบียน_':'')+data.name}
+      const w=await(await dir.getFileHandle(fn,{create:true})).createWritable();await w.write(data);await w.close();if(i==e.e)plate=fn}
+    csv+=`${name},${nm(e.s)},${nm(e.e)},${idx.length},${plate}\n`;$('exs').textContent=`ส่งออก ${n+1}/${ok.length}`}
   const w=await(await out.getFileHandle('สรุป.csv',{create:true})).createWritable();await w.write(csv);await w.close();
   $('exs').textContent=`เสร็จแล้ว ${ok.length} เหตุการณ์`};
 </script></body></html>
