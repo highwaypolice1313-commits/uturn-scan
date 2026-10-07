@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>คัดภาพรถกลับรถ</title>
+<script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.1/dist/ort.min.js"></script>
+<style>
+:root{--bg:#0f1419;--p:#1a222c;--b:#2b3744;--t:#e6edf3;--m:#8b98a5;--a:#f5a524;--ok:#3fb950;--no:#f85149}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--t);font:15px/1.5 system-ui,'Sarabun',sans-serif}
+main{max-width:1100px;margin:auto;padding:16px}h1{font-size:20px}h2{font-size:15px;margin:0 0 10px;color:var(--a)}
+section{background:var(--p);border:1px solid var(--b);border-radius:10px;padding:14px;margin-bottom:12px}
+button{background:#263341;color:var(--t);border:1px solid var(--b);border-radius:6px;padding:7px 12px;cursor:pointer;font:inherit}
+button.pri{background:var(--a);color:#111;border-color:var(--a);font-weight:600}button:disabled{opacity:.4;cursor:default}
+input[type=number]{width:72px;background:#0f1419;color:var(--t);border:1px solid var(--b);border-radius:5px;padding:4px}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:6px 0}.m{color:var(--m);font-size:13px}
+canvas{max-width:100%;display:block;background:#000;border-radius:6px}#zc{cursor:crosshair}
+#bar{height:8px;background:#0f1419;border-radius:4px;overflow:hidden}#bar i{display:block;height:100%;width:0;background:var(--a)}
+#rv{display:grid;grid-template-columns:230px 1fr;gap:12px}#list{max-height:480px;overflow:auto}
+.ev{padding:6px 8px;border-radius:6px;cursor:pointer;border-left:4px solid var(--b);font-size:13px}
+.ev.sel{background:#263341}.ev.y{border-color:var(--ok)}.ev.n{border-color:var(--no);opacity:.55}
+@media(max-width:760px){#rv{grid-template-columns:1fr}}
+</style></head><body><main>
+<h1>คัดภาพรถกลับรถ</h1>
+<p class="m">ประมวลผลในเครื่องทั้งหมด ภาพไม่ถูกส่งออกไปไหน · ใช้ได้กับ Chrome / Edge เท่านั้น</p>
+
+<section><h2>1. เลือกโฟลเดอร์ภาพและโมเดล</h2>
+<div class="row"><button id="pickDir" class="pri">เลือกโฟลเดอร์ภาพ</button><span id="dst" class="m">ยังไม่ได้เลือก</span></div>
+<div class="row"><input type="file" id="mf" accept=".onnx"><span id="mst" class="m">กำลังหาโมเดล yolov8n.onnx...</span></div></section>
+
+<section><h2>2. วาดโซนกลับรถ (ลากเมาส์บนภาพ — วาดครั้งเดียว ระบบจำไว้)</h2>
+<div class="row"><span class="m">ภาพตัวอย่าง</span><input type="range" id="ss" min="0" value="0" style="flex:1"><button id="zr">ล้างโซน</button></div>
+<canvas id="zc" width="640" height="360"></canvas>
+<div class="row">
+<label>ความมั่นใจ <input type="number" id="conf" value="0.35" step="0.05" min="0.1" max="0.9"></label>
+<label>ความไวตัดเฟรมว่าง <input type="number" id="mot" value="4" step="1" min="1"></label>
+<label>มุมกลับรถ ≥ <input type="number" id="ang" value="120" min="60" max="180">°</label>
+<label>เผื่อก่อน <input type="number" id="pre" value="3" min="0"></label>
+<label>เผื่อหลัง <input type="number" id="post" value="2" min="0"></label>
+<label><input type="checkbox" id="all"> ตรวจทุกเฟรม (ช้าลง)</label></div></section>
+
+<section><h2>3. ประมวลผล</h2>
+<div class="row"><button id="run" class="pri" disabled>เริ่มวิเคราะห์</button><button id="stop" disabled>หยุด</button><span id="pt" class="m"></span></div>
+<div id="bar"><i></i></div></section>
+
+<section><h2>4. ตรวจทาน <span id="cnt" class="m"></span></h2>
+<div id="rv"><div id="list"></div><div>
+<canvas id="vc" width="640" height="360"></canvas>
+<input type="range" id="sl" style="width:100%" min="0" max="0" value="0">
+<div id="info" class="m"></div>
+<div class="row"><button id="by" class="pri">ใช่ (Y)</button><button id="bn">ไม่ใช่ (N)</button>
+<button id="bs">ตั้งเป็นจุดเริ่ม ([)</button><button id="be">ตั้งเป็นจุดจบ (])</button></div>
+<div class="m">← → เลื่อนเฟรม · ↑ ↓ เปลี่ยนเหตุการณ์ · เส้นเขียวคือเส้นทางรถ กรอบส้มคือรถในเฟรมนั้น</div>
+</div></div>
+<div class="row"><button id="ex" class="pri" disabled>ส่งออกเหตุการณ์ที่ยืนยันแล้ว</button><span id="exs" class="m"></span></div></section>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+let files=[],session=null,zone=JSON.parse(localStorage.zone||'null'),sample=null,drag=null,W=640,H=360,P={},stopF=false;
+let events=[],tracks=[],curBmp=null,cur=-1,fi=0;
+const zc=$('zc'),zx=zc.getContext('2d'),vc=$('vc'),vx=vc.getContext('2d');
+const getBmp=async i=>createImageBitmap(await files[i].getFile());
+const ang=(a,b)=>Math.acos(Math.max(-1,Math.min(1,(a[0]*b[0]+a[1]*b[1])/(Math.hypot(...a)*Math.hypot(...b)||1))))*180/Math.PI;
+
+// ---------- โหลดโฟลเดอร์ / โมเดล ----------
+$('pickDir').onclick=async()=>{
+  if(!window.showDirectoryPicker)return alert('ต้องใช้ Chrome หรือ Edge');
+  const d=await showDirectoryPicker();files=[];
+  for await(const [n,h] of d.entries())if(h.kind==='file'&&/\.(jpe?g|png|bmp|webp)$/i.test(n))files.push(h);
+  files.sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true}));
+  $('dst').textContent=`${d.name} · ${files.length.toLocaleString()} ภาพ`;
+  $('ss').max=Math.max(0,files.length-1);$('ss').value=0;await showSample(0);gate();
+};
+async function loadModel(buf){
+  try{ort.env.wasm.wasmPaths='https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.1/dist/';
+  session=await ort.InferenceSession.create(buf,{executionProviders:['wasm']});$('mst').textContent='โหลดโมเดลแล้ว ✓';gate()}
+  catch(e){$('mst').textContent='โหลดโมเดลไม่สำเร็จ: '+e.message}
+}
+fetch('yolov8n.onnx').then(r=>r.ok?r.arrayBuffer():Promise.reject()).then(loadModel).catch(()=>$('mst').textContent='เลือกไฟล์โมเดล .onnx (yolov8n)');
+$('mf').onchange=async e=>{if(e.target.files[0])loadModel(await e.target.files[0].arrayBuffer())};
+const gate=()=>$('run').disabled=!(files.length&&session);
+
+// ---------- โซนกลับรถ ----------
+async function showSample(i){sample=await getBmp(i);W=sample.width;H=sample.height;zc.width=W;zc.height=H;drawZone()}
+function drawZone(){zx.drawImage(sample,0,0);if(!zone)return;const[a,b,c,d]=zone;
+  zx.fillStyle='rgba(245,165,36,.25)';zx.strokeStyle='#f5a524';zx.lineWidth=3;
+  zx.fillRect(a*W,b*H,(c-a)*W,(d-b)*H);zx.strokeRect(a*W,b*H,(c-a)*W,(d-b)*H)}
+const pos=e=>{const r=zc.getBoundingClientRect();return[(e.clientX-r.left)/r.width,(e.clientY-r.top)/r.height]};
+zc.onpointerdown=e=>{if(!sample)return;drag=pos(e);zc.setPointerCapture(e.pointerId)};
+zc.onpointermove=e=>{if(!drag)return;const q=pos(e);
+  zone=[Math.min(drag[0],q[0]),Math.min(drag[1],q[1]),Math.max(drag[0],q[0]),Math.max(drag[1],q[1])];drawZone()};
+zc.onpointerup=()=>{drag=null;localStorage.zone=JSON.stringify(zone)};
+$('zr').onclick=()=>{zone=null;localStorage.removeItem('zone');if(sample)drawZone()};
+$('ss').oninput=e=>showSample(+e.target.value);
+const inZone=p=>!zone||(p.cx/W>=zone[0]&&p.cx/W<=zone[2]&&p.cy/H>=zone[1]&&p.cy/H<=zone[3]);
+
+// ---------- ตรวจจับรถ (YOLOv8 ONNX) ----------
+const cv=document.createElement('canvas');cv.width=cv.height=640;const cx=cv.getContext('2d',{willReadFrequently:true});
+const sm=document.createElement('canvas');sm.width=80;sm.height=45;const smx=sm.getContext('2d',{willReadFrequently:true});
+const sc2=document.createElement('canvas'),sx=sc2.getContext('2d',{willReadFrequently:true});
+function iou(a,b){const w=Math.min(a.x2,b.x2)-Math.max(a.x1,b.x1),h=Math.min(a.y2,b.y2)-Math.max(a.y1,b.y1);
+  if(w<=0||h<=0)return 0;const i=w*h;return i/((a.x2-a.x1)*(a.y2-a.y1)+(b.x2-b.x1)*(b.y2-b.y1)-i)}
+function nms(r){r.sort((a,b)=>b.sc-a.sc);const k=[];for(const d of r)if(k.every(o=>iou(o,d)<0.5))k.push(d);return k}
+async function detect(bmp){
+  const s=Math.min(640/bmp.width,640/bmp.height),w=bmp.width*s,h=bmp.height*s,dx=(640-w)/2,dy=(640-h)/2;
+  cx.fillStyle='#727272';cx.fillRect(0,0,640,640);cx.drawImage(bmp,dx,dy,w,h);
+  const d=cx.getImageData(0,0,640,640).data,N=640*640,f=new Float32Array(3*N);
+  for(let i=0;i<N;i++){f[i]=d[i*4]/255;f[N+i]=d[i*4+1]/255;f[2*N+i]=d[i*4+2]/255}
+  const o=await session.run({[session.inputNames[0]]:new ort.Tensor('float32',f,[1,3,640,640])});
+  const out=o[session.outputNames[0]].data,A=out.length/84,res=[];
+  for(let i=0;i<A;i++){let best=0,bc=-1;
+    for(const c of [2,3,5,7]){const v=out[(4+c)*A+i];if(v>best){best=v;bc=c}}
+    if(best<P.conf)continue;const x=out[i],y=out[A+i],ww=out[2*A+i],hh=out[3*A+i];
+    const b={x1:Math.max(0,(x-ww/2-dx)/s),y1:Math.max(0,(y-hh/2-dy)/s),x2:Math.min(bmp.width,(x+ww/2-dx)/s),y2:Math.min(bmp.height,(y+hh/2-dy)/s),sc:best,c:bc};
+    if(b.x2-b.x1>0.02*bmp.width)res.push(b)}
+  return nms(res)}
+function sharp(bmp,b){ // ความคม (Laplacian variance) ของกรอบรถ ใช้เลือกเฟรมที่เห็นทะเบียนชัดสุด
+  const w=Math.max(8,b.x2-b.x1),h=Math.max(8,b.y2-b.y1),k=Math.min(1,96/w),cw=Math.round(w*k),ch=Math.round(h*k);
+  sc2.width=cw;sc2.height=ch;sx.drawImage(bmp,b.x1,b.y1,w,h,0,0,cw,ch);
+  const d=sx.getImageData(0,0,cw,ch).data,g=new Float32Array(cw*ch);
+  for(let i=0;i<g.length;i++)g[i]=.3*d[i*4]+.59*d[i*4+1]+.11*d[i*4+2];
+  let s=0,s2=0,n=0;for(let y=1;y<ch-1;y++)for(let x=1;x<cw-1;x++){const i=y*cw+x,l=4*g[i]-g[i-1]-g[i+1]-g[i-cw]-g[i+cw];s+=l;s2+=l*l;n++}
+  return n?s2/n-(s/n)**2:0}
+
+// ---------- ติดตามรถ + ตัดสินกลับรถ ----------
+const mk=(i,d)=>({i,b:d,cx:(d.x1+d.x2)/2,cy:(d.y1+d.y2)/2,s:sharp(curBmp,d)*(d.x2-d.x1)});
+function update(i,dets){const used=new Set();
+  for(const t of tracks){if(t.done)continue;const l=t.pts[t.pts.length-1];
+    let bj=-1,bd=0.9*Math.max(l.b.x2-l.b.x1,l.b.y2-l.b.y1);
+    dets.forEach((d,j)=>{if(used.has(j))return;const dd=Math.hypot((d.x1+d.x2-l.b.x1-l.b.x2)/2,(d.y1+d.y2-l.b.y1-l.b.y2)/2);if(dd<bd){bd=dd;bj=j}});
+    if(bj>=0){used.add(bj);t.pts.push(mk(i,dets[bj]))}}
+  dets.forEach((d,j)=>{if(!used.has(j))tracks.push({done:false,pts:[mk(i,d)]})});}
+function closeStale(i,force){for(const t of tracks)if(!t.done&&(force||i-t.pts[t.pts.length-1].i>P.lost)){t.done=true;evalTrack(t)}
+  tracks=tracks.filter(t=>!t.done)}
+function evalTrack(t){
+  const p=t.pts;if(p.length<P.minPts)return;
+  const k=Math.max(2,Math.floor(p.length/4)),v1=[p[k].cx-p[0].cx,p[k].cy-p[0].cy],n=p.length-1,v2=[p[n].cx-p[n-k].cx,p[n].cy-p[n-k].cy];
+  if(Math.hypot(...v1)<0.03*W||Math.hypot(...v2)<0.03*W)return;
+  const a=ang(v1,v2);if(a<P.ang||!p.some(inZone))return;
+  let s=0;for(let j=3;j<p.length;j++){const v=[p[j].cx-p[j-3].cx,p[j].cy-p[j-3].cy];
+    if(Math.hypot(...v)>=2&&ang(v,v1)>35){s=j-3;break}}
+  let bi=s;for(let j=s;j<p.length;j++)if(p[j].s>p[bi].s)bi=j;
+  events.push({s:p[s].i,e:Math.max(p[bi].i,p[s].i),t:p,ang:a,ok:null});renderList()}
+
+// ---------- วนประมวลผลทุกภาพ ----------
+function readP(){P={conf:+$('conf').value,mot:+$('mot').value/1000,ang:+$('ang').value,pre:+$('pre').value,post:+$('post').value,all:$('all').checked,hang:8,lost:8,minPts:5}}
+$('stop').onclick=()=>stopF=true;
+$('run').onclick=async()=>{
+  readP();stopF=false;events=[];tracks=[];cur=-1;renderList();
+  $('run').disabled=true;$('stop').disabled=false;let prev=null,hang=0,det=0;const t0=performance.now();
+  for(let i=0;i<files.length&&!stopF;i++){
+    const bmp=await getBmp(i);curBmp=bmp;
+    smx.drawImage(bmp,0,0,80,45);const d=smx.getImageData(0,0,80,45).data,g=new Uint8Array(3600);
+    for(let k=0;k<3600;k++)g[k]=(d[k*4]+d[k*4+1]+d[k*4+2])/3;
+    let mv=0;if(prev){let c=0;for(let k=0;k<3600;k++)if(Math.abs(g[k]-prev[k])>20)c++;mv=c/3600}prev=g;
+    if(P.all||mv>P.mot)hang=P.hang;
+    if(hang>0){hang--;det++;update(i,await detect(bmp))}
+    closeStale(i);bmp.close();
+    if(i%10==0){const sec=(performance.now()-t0)/1000;
+      $('pt').textContent=`${i+1}/${files.length} · ตรวจรถ ${det} เฟรม · พบ ${events.length} เหตุการณ์ · ใช้เวลา ${sec.toFixed(0)} วิ`;
+      $('bar').firstChild.style.width=(i/files.length*100)+'%';await new Promise(r=>setTimeout(r))}
+  }
+  closeStale(0,true);events.sort((a,b)=>a.s-b.s);renderList();
+  $('pt').textContent=(stopF?'หยุดแล้ว · ':'เสร็จแล้ว · ')+`พบ ${events.length} เหตุการณ์ที่น่าสงสัย`;
+  $('bar').firstChild.style.width='100%';$('run').disabled=false;$('stop').disabled=true;if(events.length)sel(0)};
+
+// ---------- ตรวจทาน ----------
+function renderList(){
+  $('list').innerHTML=events.map((e,k)=>`<div class="ev ${k==cur?'sel ':''}${e.ok===true?'y':e.ok===false?'n':''}" onclick="sel(${k})">#${k+1} · ภาพ ${e.s+1}–${e.e+1} · ${Math.round(e.ang)}°</div>`).join('')||'<div class="m">ยังไม่มีเหตุการณ์</div>';
+  const y=events.filter(e=>e.ok).length;$('cnt').textContent=events.length?`(ยืนยัน ${y} / ${events.length})`:'';$('ex').disabled=!y}
+async function sel(k){cur=k;const e=events[k],sl=$('sl');
+  sl.min=Math.max(0,e.t[0].i-5);sl.max=Math.min(files.length-1,e.t[e.t.length-1].i+5);renderList();await show(e.s)}
+async function show(i){
+  if(cur<0)return;fi=i;$('sl').value=i;const bmp=await getBmp(i),e=events[cur];
+  vc.width=bmp.width;vc.height=bmp.height;vx.drawImage(bmp,0,0);bmp.close();
+  vx.fillStyle='#3fb950';e.t.forEach(p=>{vx.beginPath();vx.arc(p.cx,p.cy,4,0,7);vx.fill()});
+  const q=e.t.find(p=>p.i==i);if(q){vx.strokeStyle='#f5a524';vx.lineWidth=4;vx.strokeRect(q.b.x1,q.b.y1,q.b.x2-q.b.x1,q.b.y2-q.b.y1)}
+  $('info').textContent=`${files[i].name}${i==e.s?' · จุดเริ่ม':''}${i==e.e?' · จุดจบ (เห็นทะเบียน)':''} — ช่วง ${files[e.s].name} → ${files[e.e].name}`}
+$('sl').oninput=e=>show(+e.target.value);
+function mark(v){if(cur<0)return;events[cur].ok=v;renderList();if(cur<events.length-1)sel(cur+1)}
+$('by').onclick=()=>mark(true);$('bn').onclick=()=>mark(false);
+$('bs').onclick=()=>{if(cur>=0){events[cur].s=Math.min(fi,events[cur].e);show(fi);renderList()}};
+$('be').onclick=()=>{if(cur>=0){events[cur].e=Math.max(fi,events[cur].s);show(fi);renderList()}};
+document.addEventListener('keydown',e=>{if(/INPUT/.test(e.target.tagName)&&e.target.type!=='range')return;const k=e.key;
+  if(k==='y'||k==='Y')mark(true);else if(k==='n'||k==='N')mark(false);
+  else if(k==='ArrowRight'){e.preventDefault();show(Math.min(+$('sl').max,fi+1))}
+  else if(k==='ArrowLeft'){e.preventDefault();show(Math.max(+$('sl').min,fi-1))}
+  else if(k==='ArrowDown'&&cur<events.length-1){e.preventDefault();sel(cur+1)}
+  else if(k==='ArrowUp'&&cur>0){e.preventDefault();sel(cur-1)}
+  else if(k==='[')$('bs').click();else if(k===']')$('be').click()});
+
+// ---------- ส่งออก ----------
+$('ex').onclick=async()=>{
+  const out=await showDirectoryPicker({mode:'readwrite'}),ok=events.filter(e=>e.ok);let csv='\ufeffเหตุการณ์,ไฟล์เริ่ม,ไฟล์จบ,จำนวนภาพ\n';
+  for(let n=0;n<ok.length;n++){const e=ok[n],name='เหตุการณ์_'+String(n+1).padStart(3,'0');
+    const dir=await out.getDirectoryHandle(name,{create:true}),a=Math.max(0,e.s-P.pre),b=Math.min(files.length-1,e.e+P.post);
+    for(let i=a;i<=b;i++){const f=await files[i].getFile(),w=await(await dir.getFileHandle(f.name,{create:true})).createWritable();await w.write(f);await w.close()}
+    csv+=`${name},${files[a].name},${files[b].name},${b-a+1}\n`;$('exs').textContent=`ส่งออก ${n+1}/${ok.length}`}
+  const w=await(await out.getFileHandle('สรุป.csv',{create:true})).createWritable();await w.write(csv);await w.close();
+  $('exs').textContent=`เสร็จแล้ว ${ok.length} เหตุการณ์`};
+</script></body></html>
