@@ -17,6 +17,10 @@ canvas{max-width:100%;display:block;background:#000;border-radius:6px}#zc{cursor
 .ev{padding:6px 8px;border-radius:6px;cursor:pointer;border-left:4px solid var(--b);font-size:13px}
 .ev.sel{background:#263341}.ev.y{border-color:var(--ok)}.ev.n{border-color:var(--no);opacity:.55}
 @media(max-width:760px){#rv{grid-template-columns:1fr}}
+input[type=text]{background:#0f1419;color:var(--t);border:1px solid var(--b);border-radius:5px;padding:6px 8px;font:inherit}
+select{background:#0f1419;color:var(--t);border:1px solid var(--b);border-radius:5px;padding:6px;font:inherit;max-width:100%}
+#plate{display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:12px;margin:10px 0}
+@media(max-width:760px){#plate{grid-template-columns:1fr}}
 </style></head><body><main>
 <h1>คัดภาพรถกลับรถ</h1>
 <p class="m">ประมวลผลในเครื่องทั้งหมด ภาพไม่ถูกส่งออกไปไหน · ใช้ได้กับ Chrome / Edge เท่านั้น</p>
@@ -50,6 +54,13 @@ canvas{max-width:100%;display:block;background:#000;border-radius:6px}#zc{cursor
 <canvas id="vc" width="640" height="360"></canvas>
 <input type="range" id="sl" style="width:100%" min="0" max="0" value="0">
 <div id="info" class="m"></div>
+<div id="plate"><canvas id="pc" width="480" height="270"></canvas><div>
+<div class="m">ข้อมูลสำหรับกรอกใน PTM · Enter = ช่องถัดไป / ยืนยัน</div>
+<div class="row"><select id="pty"><option value="">ประเภทรถ...</option><option>รถเก๋ง/รถนั่ง</option><option>รถกระบะ</option><option>รถตู้</option><option>รถบรรทุก</option><option>รถโดยสาร</option><option>รถจักรยานยนต์</option><option>อื่นๆ</option></select></div>
+<div class="row"><input type="text" id="pf" placeholder="หมวด เช่น กข" size="7"> - <input type="text" id="pn" placeholder="เลข" size="7"></div>
+<div class="row"><input type="text" id="pv" list="provs" placeholder="จังหวัด" size="16"><datalist id="provs"></datalist></div>
+<div class="row"><button id="c1">คัดลอกหมวด</button><button id="c2">คัดลอกเลข</button><button id="c3">คัดลอกจังหวัด</button></div>
+</div></div>
 <div class="row"><button id="by" class="pri">ใช่ (Y)</button><button id="bn">ไม่ใช่ (N)</button>
 <button id="bs">ตั้งเป็นจุดเริ่ม ([)</button><button id="be">ตั้งเป็นจุดจบ (])</button></div>
 <div class="m">← → เลื่อนเฟรม · ↑ ↓ เปลี่ยนเหตุการณ์ · เส้นเขียวคือเส้นทางรถ กรอบส้มคือรถในเฟรมนั้น</div>
@@ -210,7 +221,7 @@ function renderList(){
   $('list').innerHTML=events.map((e,k)=>`<div class="ev ${k==cur?'sel ':''}${e.ok===true?'y':e.ok===false?'n':''}" onclick="sel(${k})">#${k+1} · ภาพ ${e.s+1}–${e.e+1} · ${e.ang?Math.round(e.ang)+'°':'A→B'}</div>`).join('')||'<div class="m">ยังไม่มีเหตุการณ์</div>';
   const y=events.filter(e=>e.ok).length;$('cnt').textContent=events.length?`(ยืนยัน ${y} / ${events.length})`:'';$('ex').disabled=!y}
 async function sel(k){cur=k;const e=events[k],sl=$('sl');
-  sl.min=Math.max(0,e.t[0].i-5);sl.max=Math.min(N()-1,e.t[e.t.length-1].i+5);renderList();await show(e.s)}
+  sl.min=Math.max(0,e.t[0].i-5);sl.max=Math.min(N()-1,e.t[e.t.length-1].i+5);renderList();loadPlate();await show(e.s);drawPlate()}
 async function show(i){
   if(cur<0)return;fi=i;$('sl').value=i;const bmp=await getBmp(i),e=events[cur];
   vc.width=bmp.width;vc.height=bmp.height;vx.drawImage(bmp,0,0);bmp.close();
@@ -218,11 +229,11 @@ async function show(i){
   const q=e.t.find(p=>p.i==i);if(q){vx.strokeStyle='#f5a524';vx.lineWidth=4;vx.strokeRect(q.b.x1,q.b.y1,q.b.x2-q.b.x1,q.b.y2-q.b.y1)}
   $('info').textContent=`${nm(i)}${i==e.s?' · จุดเริ่ม':''}${i==e.e?' · จุดจบ (เห็นทะเบียน)':''} — ช่วง ${nm(e.s)} → ${nm(e.e)}`}
 $('sl').oninput=e=>show(+e.target.value);
-function mark(v){if(cur<0)return;events[cur].ok=v;renderList();if(cur<events.length-1)sel(cur+1)}
+function mark(v){if(cur<0)return;events[cur].ok=v;renderList();if(cur<events.length-1)sel(cur+1).then(()=>$('pf').focus())}
 $('by').onclick=()=>mark(true);$('bn').onclick=()=>mark(false);
 $('bs').onclick=()=>{if(cur>=0){events[cur].s=Math.min(fi,events[cur].e);show(fi);renderList()}};
-$('be').onclick=()=>{if(cur>=0){events[cur].e=Math.max(fi,events[cur].s);show(fi);renderList()}};
-document.addEventListener('keydown',e=>{if(/INPUT/.test(e.target.tagName)&&e.target.type!=='range')return;const k=e.key;
+$('be').onclick=()=>{if(cur>=0){events[cur].e=Math.max(fi,events[cur].s);show(fi);renderList();drawPlate()}};
+document.addEventListener('keydown',e=>{if(/INPUT|SELECT/.test(e.target.tagName)&&e.target.type!=='range')return;const k=e.key;
   if(k==='y'||k==='Y')mark(true);else if(k==='n'||k==='N')mark(false);
   else if(k==='ArrowRight'){e.preventDefault();show(Math.min(+$('sl').max,fi+1))}
   else if(k==='ArrowLeft'){e.preventDefault();show(Math.max(+$('sl').min,fi-1))}
@@ -230,11 +241,31 @@ document.addEventListener('keydown',e=>{if(/INPUT/.test(e.target.tagName)&&e.tar
   else if(k==='ArrowUp'&&cur>0){e.preventDefault();sel(cur-1)}
   else if(k==='[')$('bs').click();else if(k===']')$('be').click()});
 
+// ---------- ข้อมูลทะเบียนสำหรับ PTM ----------
+const PROV='กรุงเทพมหานคร กระบี่ กาญจนบุรี กาฬสินธุ์ กำแพงเพชร ขอนแก่น จันทบุรี ฉะเชิงเทรา ชลบุรี ชัยนาท ชัยภูมิ ชุมพร เชียงราย เชียงใหม่ ตรัง ตราด ตาก นครนายก นครปฐม นครพนม นครราชสีมา นครศรีธรรมราช นครสวรรค์ นนทบุรี นราธิวาส น่าน บึงกาฬ บุรีรัมย์ ปทุมธานี ประจวบคีรีขันธ์ ปราจีนบุรี ปัตตานี พระนครศรีอยุธยา พะเยา พังงา พัทลุง พิจิตร พิษณุโลก เพชรบุรี เพชรบูรณ์ แพร่ ภูเก็ต มหาสารคาม มุกดาหาร แม่ฮ่องสอน ยโสธร ยะลา ร้อยเอ็ด ระนอง ระยอง ราชบุรี ลพบุรี ลำปาง ลำพูน เลย ศรีสะเกษ สกลนคร สงขลา สตูล สมุทรปราการ สมุทรสงคราม สมุทรสาคร สระแก้ว สระบุรี สิงห์บุรี สุโขทัย สุพรรณบุรี สุราษฎร์ธานี สุรินทร์ หนองคาย หนองบัวลำภู อ่างทอง อำนาจเจริญ อุดรธานี อุตรดิตถ์ อุทัยธานี อุบลราชธานี'.split(' ');
+$('provs').innerHTML=PROV.map(p=>`<option value="${p}">`).join('');
+let lastType='';
+function loadPlate(){const p=(events[cur]&&events[cur].plate)||{};$('pty').value=p.t!==undefined?p.t:lastType;$('pf').value=p.f||'';$('pn').value=p.n||'';$('pv').value=p.v||''}
+function savePlate(){const e=events[cur];if(!e)return;lastType=$('pty').value;e.plate={t:lastType,f:$('pf').value.trim(),n:$('pn').value.trim(),v:$('pv').value.trim()}}
+['pty','pf','pn','pv'].forEach(id=>$(id).addEventListener('input',savePlate));
+$('pf').onkeydown=e=>{if(e.key==='Enter')$('pn').focus()};
+$('pn').onkeydown=e=>{if(e.key==='Enter')$('pv').focus()};
+$('pv').onkeydown=e=>{if(e.key==='Enter'){savePlate();mark(true)}};
+[['c1','pf'],['c2','pn'],['c3','pv']].forEach(([b,f])=>$(b).onclick=()=>navigator.clipboard.writeText($(f).value));
+async function drawPlate(){const e=events[cur];if(!e)return;
+  let q=e.t[0];for(const p of e.t)if(Math.abs(p.i-e.e)<Math.abs(q.i-e.e))q=p;
+  const bmp=await getBmp(e.e),b=q.b,m=0.08,w=b.x2-b.x1,h=b.y2-b.y1,
+  sx=Math.max(0,b.x1-w*m),sy=Math.max(0,b.y1-h*m),sw=Math.min(bmp.width-sx,w*(1+2*m)),sh=Math.min(bmp.height-sy,h*(1+2*m)),pc=$('pc');
+  pc.width=Math.min(640,Math.max(320,Math.round(sw*2)));pc.height=Math.round(pc.width*sh/sw);
+  pc.getContext('2d').drawImage(bmp,sx,sy,sw,sh,0,0,pc.width,pc.height);bmp.close()}
+onbeforeunload=e=>{if(events.length)e.preventDefault()};
+const plSuffix=e=>{const p=e.plate||{};const x=[p.f&&p.n?p.f+p.n:p.f||p.n,p.v].filter(Boolean).join('-').replace(/[\\/:*?"<>|\s]/g,'');return x?'_'+x:''};
+
 // ---------- ส่งออก ----------
 $('ex').onclick=async()=>{
   const out=await showDirectoryPicker({mode:'readwrite'}),ok=events.filter(e=>e.ok),all=$('exall').checked;
-  let csv='\ufeffเหตุการณ์,จุดเริ่ม,จุดเห็นทะเบียน,จำนวนภาพ,ไฟล์ภาพเห็นทะเบียน\n';
-  for(let n=0;n<ok.length;n++){const e=ok[n],name='เหตุการณ์_'+pad(n+1).padStart(3,'0'),dir=await out.getDirectoryHandle(name,{create:true});
+  let csv='\ufeffเหตุการณ์,จุดเริ่ม,จุดเห็นทะเบียน,จำนวนภาพ,ไฟล์ภาพเห็นทะเบียน,ประเภทรถ,หมวด,เลข,จังหวัด\n';
+  for(let n=0;n<ok.length;n++){const e=ok[n],name='เหตุการณ์_'+pad(n+1).padStart(3,'0')+plSuffix(e),dir=await out.getDirectoryHandle(name,{create:true});
     let idx=[];
     if(all){for(let i=Math.max(0,e.s-P.pre);i<=Math.min(N()-1,e.e+P.post);i++)idx.push(i)}
     else{const m=Math.min(5,e.e-e.s+1);for(let k=0;k<m;k++)idx.push(e.s+Math.round(k*(e.e-e.s)/Math.max(1,m-1)));idx=[...new Set(idx)]}
@@ -244,7 +275,7 @@ $('ex').onclick=async()=>{
         data=await new Promise(r=>c.toBlob(r,'image/jpeg',.95));fn=vfn.replace(/\.[^.]+$/,'')+'_'+fmtT(i*VS,'-')+(i==e.e?'_ทะเบียน':'')+'.jpg'}
       else{data=await files[i].getFile();fn=(i==e.e?'ทะเบียน_':'')+data.name}
       const w=await(await dir.getFileHandle(fn,{create:true})).createWritable();await w.write(data);await w.close();if(i==e.e)plate=fn}
-    csv+=`${name},${nm(e.s)},${nm(e.e)},${idx.length},${plate}\n`;$('exs').textContent=`ส่งออก ${n+1}/${ok.length}`}
+    csv+=`${name},${nm(e.s)},${nm(e.e)},${idx.length},${plate},${(e.plate||{}).t||''},${(e.plate||{}).f||''},${(e.plate||{}).n||''},${(e.plate||{}).v||''}\n`;$('exs').textContent=`ส่งออก ${n+1}/${ok.length}`}
   const w=await(await out.getFileHandle('สรุป.csv',{create:true})).createWritable();await w.write(csv);await w.close();
   $('exs').textContent=`เสร็จแล้ว ${ok.length} เหตุการณ์`};
 </script></body></html>
