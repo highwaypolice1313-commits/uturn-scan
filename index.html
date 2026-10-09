@@ -21,10 +21,18 @@ input[type=text]{background:#0f1419;color:var(--t);border:1px solid var(--b);bor
 select{background:#0f1419;color:var(--t);border:1px solid var(--b);border-radius:5px;padding:6px;font:inherit;max-width:100%}
 #plate{display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:12px;margin:10px 0}
 @media(max-width:760px){#plate{grid-template-columns:1fr}}
+
+.tabs{display:flex;gap:6px;margin:10px 0}.tabs button.on,#qb0.on,#qb1.on,#qb2.on{background:var(--a);color:#111;border-color:var(--a);font-weight:600}
+.g2{display:grid;grid-template-columns:230px 1fr;gap:12px}@media(max-width:760px){.g2{grid-template-columns:1fr}}
+.drop{border:2px dashed var(--b);border-radius:8px;padding:16px;text-align:center;color:var(--m);margin-top:8px}.drop.on{border-color:var(--a);color:var(--t)}
+.zv{position:relative;overflow:hidden;background:#000;border-radius:6px;height:min(60vh,460px);cursor:grab;touch-action:none}
+.zv img{position:absolute;left:0;top:0;transform-origin:0 0;max-width:none;user-select:none;-webkit-user-drag:none}
 </style></head><body><main>
 <h1>คัดภาพรถกลับรถ</h1>
 <p class="m">ประมวลผลในเครื่องทั้งหมด ภาพไม่ถูกส่งออกไปไหน · ใช้ได้กับ Chrome / Edge เท่านั้น</p>
 
+<div class="tabs"><button id="tab1" class="on">1. คัดกลับรถ</button><button id="tab2">2. บันทึกทะเบียน PTM</button></div>
+<div id="t1">
 <section><h2>1. เลือกโฟลเดอร์ภาพและโมเดล</h2>
 <div class="row"><button id="pickDir" class="pri">เลือกโฟลเดอร์ภาพ</button><span id="dst" class="m">ยังไม่ได้เลือก</span></div>
 <div class="row"><button id="pickVid">หรือเลือกไฟล์วิดีโอ</button><label>ตรวจ <input type="number" id="vfps" value="5" min="1" max="30"> เฟรม/วินาที (วิดีโอเท่านั้น)</label></div>
@@ -65,7 +73,24 @@ select{background:#0f1419;color:var(--t);border:1px solid var(--b);border-radius
 <button id="bs">ตั้งเป็นจุดเริ่ม ([)</button><button id="be">ตั้งเป็นจุดจบ (])</button></div>
 <div class="m">← → เลื่อนเฟรม · ↑ ↓ เปลี่ยนเหตุการณ์ · เส้นเขียวคือเส้นทางรถ กรอบส้มคือรถในเฟรมนั้น</div>
 </div></div>
-<div class="row"><label><input type="checkbox" id="exall"> ส่งออกทุกภาพในช่วง (ไม่ติ๊ก = เฉพาะภาพสำคัญ ประมาณ 5 ภาพ)</label><button id="ex" class="pri" disabled>ส่งออกเหตุการณ์ที่ยืนยันแล้ว</button><span id="exs" class="m"></span></div></section>
+<div class="row"><label><input type="checkbox" id="exall"> ส่งออกทุกภาพในช่วง (ไม่ติ๊ก = 3 ภาพ: ก่อน / ระหว่าง / ทะเบียน · ไม่มีกรอบ)</label><button id="ex" class="pri" disabled>ส่งออกเหตุการณ์ที่ยืนยันแล้ว</button><button id="tosend">ส่งไปแท็บบันทึกทะเบียน</button><span id="exs" class="m"></span></div></section>
+</div>
+<div id="t2" hidden>
+<section><h2>บันทึกทะเบียนส่งเข้า PTM</h2>
+<div class="row"><button id="qadd" class="pri">เพิ่มภาพ</button><input type="file" id="qfile" accept="image/*" multiple hidden>
+<label><input type="checkbox" id="qpair"> จับกลุ่มทีละ 3 ภาพ (ก่อน, ระหว่าง, ทะเบียน — เรียงตามชื่อไฟล์)</label>
+<a href="ptm-fill.user.js" class="m">ติดตั้งสคริปต์เติม PTM</a></div>
+<div id="qdrop" class="drop">ลากภาพมาวางที่นี่ หรือกด Ctrl+V เพื่อวางภาพ · เพิ่มทีละคันหรือหลายภาพพร้อมกันก็ได้</div></section>
+<section><div class="g2"><div id="qlist" style="max-height:520px;overflow:auto"></div>
+<div>
+<div class="row"><button id="qb0">1 ก่อน</button><button id="qb1">2 ระหว่าง</button><button id="qb2">3 ทะเบียน</button><button id="zin">＋</button><button id="zout">－</button><button id="zfit">พอดีจอ</button><span class="m">ล้อเมาส์ซูม · ลากเพื่อเลื่อน</span></div>
+<div id="qzv" class="zv"><img id="qimg" alt=""></div>
+<div class="row" style="margin-top:10px"><input type="text" id="qt" list="tys" placeholder="ประเภทรถ" size="18"><datalist id="tys"></datalist>
+<input type="text" id="qf" placeholder="หมวด" size="6" maxlength="3"> - <input type="text" id="qn" placeholder="เลข" size="6" maxlength="4">
+<input type="text" id="qv" list="provs" placeholder="จังหวัด" size="16"></div>
+<div class="row"><button id="qsend" class="pri">คัดลอกส่ง PTM (Enter)</button><button id="qskip">ข้าม</button><button id="qdel">ลบรายการ</button><button id="qcsv">ดาวน์โหลดสรุป CSV</button><span id="qst" class="m"></span></div>
+<div class="m">วิธีใช้: กรอกหมวด → เลข → จังหวัด แล้วกด Enter (ระบบคัดลอกข้อมูล) → สลับไปแท็บ PTM สคริปต์จะเติมฟอร์มและกดตรวจสอบให้ → เทียบรูปกับข้อมูลรถ แล้วลากรูปใส่ช่องอัปโหลดเอง</div>
+</div></div></section></div>
 </main>
 <script>
 const $=id=>document.getElementById(id);
@@ -233,7 +258,7 @@ function mark(v){if(cur<0)return;events[cur].ok=v;renderList();if(cur<events.len
 $('by').onclick=()=>mark(true);$('bn').onclick=()=>mark(false);
 $('bs').onclick=()=>{if(cur>=0){events[cur].s=Math.min(fi,events[cur].e);show(fi);renderList()}};
 $('be').onclick=()=>{if(cur>=0){events[cur].e=Math.max(fi,events[cur].s);show(fi);renderList();drawPlate()}};
-document.addEventListener('keydown',e=>{if(/INPUT|SELECT/.test(e.target.tagName)&&e.target.type!=='range')return;const k=e.key;
+document.addEventListener('keydown',e=>{if($('t1').hidden)return;if(/INPUT|SELECT/.test(e.target.tagName)&&e.target.type!=='range')return;const k=e.key;
   if(k==='y'||k==='Y')mark(true);else if(k==='n'||k==='N')mark(false);
   else if(k==='ArrowRight'){e.preventDefault();show(Math.min(+$('sl').max,fi+1))}
   else if(k==='ArrowLeft'){e.preventDefault();show(Math.max(+$('sl').min,fi-1))}
@@ -258,24 +283,78 @@ async function drawPlate(){const e=events[cur];if(!e)return;
   sx=Math.max(0,b.x1-w*m),sy=Math.max(0,b.y1-h*m),sw=Math.min(bmp.width-sx,w*(1+2*m)),sh=Math.min(bmp.height-sy,h*(1+2*m)),pc=$('pc');
   pc.width=Math.min(640,Math.max(320,Math.round(sw*2)));pc.height=Math.round(pc.width*sh/sw);
   pc.getContext('2d').drawImage(bmp,sx,sy,sw,sh,0,0,pc.width,pc.height);bmp.close()}
-onbeforeunload=e=>{if(events.length)e.preventDefault()};
+onbeforeunload=e=>{if(events.length||Q.length)e.preventDefault()};
 const plSuffix=e=>{const p=e.plate||{};const x=[p.f&&p.n?p.f+p.n:p.f||p.n,p.v].filter(Boolean).join('-').replace(/[\\/:*?"<>|\s]/g,'');return x?'_'+x:''};
 
 // ---------- ส่งออก ----------
+const jpg=async i=>{const b=await getBmp(i),c=document.createElement('canvas');c.width=b.width;c.height=b.height;c.getContext('2d').drawImage(b,0,0);b.close();return new Promise(r=>c.toBlob(r,'image/jpeg',.95))}; // ภาพดิบ ไม่มีกรอบ
+const three=e=>{const pre=(typeof P.pre==='number'?P.pre:3),pl=e.e,bf=Math.max(0,e.s-Math.max(1,pre));let du=Math.round((e.s+e.e)/2);if(du<=bf)du=Math.min(pl,bf+1);return{bf,du,pl}};
 $('ex').onclick=async()=>{
   const out=await showDirectoryPicker({mode:'readwrite'}),ok=events.filter(e=>e.ok),all=$('exall').checked;
   let csv='\ufeffเหตุการณ์,จุดเริ่ม,จุดเห็นทะเบียน,จำนวนภาพ,ไฟล์ภาพเห็นทะเบียน,ประเภทรถ,หมวด,เลข,จังหวัด\n';
   for(let n=0;n<ok.length;n++){const e=ok[n],name='เหตุการณ์_'+pad(n+1).padStart(3,'0')+plSuffix(e),dir=await out.getDirectoryHandle(name,{create:true});
     let idx=[];
     if(all){for(let i=Math.max(0,e.s-P.pre);i<=Math.min(N()-1,e.e+P.post);i++)idx.push(i)}
-    else{const m=Math.min(5,e.e-e.s+1);for(let k=0;k<m;k++)idx.push(e.s+Math.round(k*(e.e-e.s)/Math.max(1,m-1)));idx=[...new Set(idx)]}
+    else{const t=three(e);idx=[t.bf,t.du,t.pl]}
     let plate='';
     for(const i of idx){let fn,data;
       if(vid){const b=await getBmp(i),c=document.createElement('canvas');c.width=b.width;c.height=b.height;c.getContext('2d').drawImage(b,0,0);b.close();
-        data=await new Promise(r=>c.toBlob(r,'image/jpeg',.95));fn=vfn.replace(/\.[^.]+$/,'')+'_'+fmtT(i*VS,'-')+(i==e.e?'_ทะเบียน':'')+'.jpg'}
-      else{data=await files[i].getFile();fn=(i==e.e?'ทะเบียน_':'')+data.name}
+        data=await new Promise(r=>c.toBlob(r,'image/jpeg',.95));fn=(all?'':({[three(e).bf]:'1_ก่อนกระทำผิด_',[three(e).du]:'2_ระหว่างกระทำผิด_',[three(e).pl]:'3_ทะเบียน_'}[i]||''))+vfn.replace(/\.[^.]+$/,'')+'_'+fmtT(i*VS,'-')+'.jpg'}
+      else{data=await files[i].getFile();const t3=three(e);fn=(all?(i==e.e?'3_ทะเบียน_':''):(i==t3.bf?'1_ก่อนกระทำผิด_':i==t3.pl?'3_ทะเบียน_':i==t3.du?'2_ระหว่างกระทำผิด_':''))+data.name}
       const w=await(await dir.getFileHandle(fn,{create:true})).createWritable();await w.write(data);await w.close();if(i==e.e)plate=fn}
     csv+=`${name},${nm(e.s)},${nm(e.e)},${idx.length},${plate},${(e.plate||{}).t||''},${(e.plate||{}).f||''},${(e.plate||{}).n||''},${(e.plate||{}).v||''}\n`;$('exs').textContent=`ส่งออก ${n+1}/${ok.length}`}
   const w=await(await out.getFileHandle('สรุป.csv',{create:true})).createWritable();await w.write(csv);await w.close();
   $('exs').textContent=`เสร็จแล้ว ${ok.length} เหตุการณ์`};
+// ---------- แท็บ 2: บันทึกทะเบียน → PTM ----------
+const Q=[];let qc=-1,qview='car',qurl=null,zs=1,zx0=0,zy0=0,pd=null,lastQT='';
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function tab(n){$('t1').hidden=n!=1;$('t2').hidden=n!=2;$('tab1').classList.toggle('on',n==1);$('tab2').classList.toggle('on',n==2)}
+$('tab1').onclick=()=>tab(1);$('tab2').onclick=()=>tab(2);
+$('tys').innerHTML=[...$('pty').options].filter(o=>o.value).map(o=>`<option value="${o.value}">`).join('');
+const LB=['ก่อนกระทำผิด','ระหว่างกระทำผิด','ภาพทะเบียน'];
+const mkQ=(imgs,name)=>({imgs,name:name||(imgs[0]&&imgs[0].name)||'',t:'',f:'',n:'',v:'',done:false});
+function qAdd(fs){fs=[...fs].filter(f=>/^image\//.test(f.type)).sort((a,b)=>(a.name||'').localeCompare(b.name||'',undefined,{numeric:true}));
+  if(!fs.length)return;
+  if($('qpair').checked){for(let i=0;i<fs.length;i+=3)Q.push(mkQ([fs[i],fs[i+1]||null,fs[i+2]||null]))}else fs.forEach(f=>Q.push(mkQ([f,null,null])));
+  if(qc<0)qsel(0);else qRender()}
+function qRender(){$('qlist').innerHTML=Q.map((q,k)=>`<div class="ev ${k==qc?'sel ':''}${q.done?'y':''}" onclick="qsel(${k})">#${k+1} · ${esc([q.f&&q.n?q.f+' '+q.n:q.f||q.n,q.v].filter(Boolean).join(' · ')||'ยังไม่กรอก')}</div>`).join('')||'<div class="m">ยังไม่มีรายการ</div>'}
+function qsel(k){qc=k;const q=Q[k];qview=q.imgs[2]?2:q.imgs[1]?1:0;$('qt').value=q.t||lastQT;$('qf').value=q.f;$('qn').value=q.n;$('qv').value=q.v;qRender();qShow()}
+function qShow(){const q=Q[qc];if(!q)return;if(qurl)URL.revokeObjectURL(qurl);qurl=URL.createObjectURL(q.imgs[qview]||q.imgs[0]);
+  const im=$('qimg');im.onload=zfit;im.src=qurl;[0,1,2].forEach(k=>{$('qb'+k).disabled=!q.imgs[k];$('qb'+k).classList.toggle('on',k===qview)})}
+const zApply=()=>$('qimg').style.transform=`translate(${zx0}px,${zy0}px) scale(${zs})`;
+function zfit(){const im=$('qimg'),r=$('qzv').getBoundingClientRect();if(!im.naturalWidth||!r.width)return;
+  zs=Math.min(r.width/im.naturalWidth,r.height/im.naturalHeight);zx0=(r.width-im.naturalWidth*zs)/2;zy0=(r.height-im.naturalHeight*zs)/2;zApply()}
+function zoom(k,mx,my){const r=$('qzv').getBoundingClientRect();mx=mx??r.width/2;my=my??r.height/2;const ns=Math.min(30,Math.max(.1,zs*k));zx0=mx-(mx-zx0)*ns/zs;zy0=my-(my-zy0)*ns/zs;zs=ns;zApply()}
+$('qzv').onwheel=e=>{e.preventDefault();const r=$('qzv').getBoundingClientRect();zoom(e.deltaY<0?1.2:1/1.2,e.clientX-r.left,e.clientY-r.top)};
+$('qzv').onpointerdown=e=>{pd=[e.clientX-zx0,e.clientY-zy0];$('qzv').setPointerCapture(e.pointerId)};
+$('qzv').onpointermove=e=>{if(!pd)return;zx0=e.clientX-pd[0];zy0=e.clientY-pd[1];zApply()};
+$('qzv').onpointerup=()=>pd=null;
+$('zin').onclick=()=>zoom(1.3);$('zout').onclick=()=>zoom(1/1.3);$('zfit').onclick=zfit;
+[0,1,2].forEach(k=>$('qb'+k).onclick=()=>{qview=k;qShow()});
+[['qt','t'],['qf','f'],['qn','n'],['qv','v']].forEach(([id,k])=>$(id).addEventListener('input',()=>{const q=Q[qc];if(!q)return;q[k]=$(id).value.trim();if(k==='t')lastQT=q.t;q.done=false;qRender()}));
+$('qf').onkeydown=e=>{if(e.key==='Enter')$('qn').focus()};
+$('qn').onkeydown=e=>{if(e.key==='Enter')$('qv').focus()};
+$('qv').onkeydown=e=>{if(e.key==='Enter')qSend()};
+async function qSend(){const q=Q[qc];if(!q)return;if(!q.n){$('qst').textContent='ยังไม่ได้กรอกเลขทะเบียน';return}
+  const d={_uturn:1,id:Date.now(),type:q.t,f:q.f,n:q.n,prov:q.v};
+  try{await navigator.clipboard.writeText(JSON.stringify(d))}catch(e){$('qst').textContent='คัดลอกไม่สำเร็จ: '+e.message;return}
+  q.done=true;$('qst').textContent='คัดลอกแล้ว — สลับไปแท็บ PTM ให้สคริปต์เติมฟอร์ม';
+  if(qc<Q.length-1){qsel(qc+1);$('qf').focus()}else qRender()}
+$('qsend').onclick=qSend;
+$('qskip').onclick=()=>{if(qc<Q.length-1)qsel(qc+1)};
+$('qdel').onclick=()=>{if(qc<0)return;Q.splice(qc,1);qc=Math.min(qc,Q.length-1);if(qc>=0)qsel(qc);else{qRender();$('qimg').removeAttribute('src')}};
+$('qcsv').onclick=()=>{const rows=['\ufeffลำดับ,ประเภทรถ,หมวด,เลข,จังหวัด,ภาพ,ส่งแล้ว'];
+  Q.forEach((q,i)=>rows.push([i+1,q.t,q.f,q.n,q.v,q.name,q.done?'ใช่':''].map(x=>`"${String(x).replace(/"/g,'""')}"`).join(',')));
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([rows.join('\n')],{type:'text/csv'}));a.download='ทะเบียน.csv';a.click()};
+$('qadd').onclick=()=>$('qfile').click();$('qfile').onchange=e=>{qAdd(e.target.files);e.target.value=''};
+['dragover','dragenter'].forEach(t=>document.addEventListener(t,e=>{if(!$('t2').hidden){e.preventDefault();$('qdrop').classList.add('on')}}));
+['dragleave','drop'].forEach(t=>document.addEventListener(t,()=>$('qdrop').classList.remove('on')));
+document.addEventListener('drop',e=>{if($('t2').hidden)return;e.preventDefault();qAdd(e.dataTransfer.files)});
+document.addEventListener('paste',e=>{if($('t2').hidden)return;const fs=[...e.clipboardData.files];if(fs.length)qAdd(fs)});
+$('tosend').onclick=async()=>{const ok=events.filter(e=>e.ok);if(!ok.length)return alert('ยังไม่มีเหตุการณ์ที่ยืนยัน');
+  $('tosend').disabled=true;tab(2);
+  for(const e of ok){const t=three(e),p0=e.plate||{},it=mkQ([await jpg(t.bf),await jpg(t.du),await jpg(t.pl)],nm(e.e));
+    it.imgs.forEach((b,k)=>b.name=['1_ก่อนกระทำผิด','2_ระหว่างกระทำผิด','3_ทะเบียน'][k]+'.jpg');
+    it.t=p0.t||'';it.f=p0.f||'';it.n=p0.n||'';it.v=p0.v||'';Q.push(it)}
+  $('tosend').disabled=false;if(qc<0)qsel(0);else qRender()};
 </script></body></html>
