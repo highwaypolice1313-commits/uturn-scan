@@ -66,7 +66,7 @@ canvas{max-width:100%;display:block;background:#000;border-radius:8px}
 .plate{display:grid;grid-template-columns:minmax(0,1fr) 250px;gap:14px;margin-top:14px}
 .plate .f{display:flex;flex-direction:column;gap:8px}
 .plate input,.plate select{width:100%}
-.view[hidden],[hidden]{display:none!important}
+[hidden]{display:none!important}
 @media(max-width:900px){
   .layout,.rv{grid-template-columns:1fr}
   aside{border-right:0;border-bottom:1px solid var(--bd)}
@@ -136,7 +136,7 @@ canvas{max-width:100%;display:block;background:#000;border-radius:8px}
         <label>มุมกลับรถ ≥ <input type="number" id="ang" value="120" min="60" max="180">°</label>
         <label>เผื่อก่อน <input type="number" id="pre" value="2" min="0"> วิ</label>
         <label>เผื่อหลัง <input type="number" id="post" value="2" min="0"> วิ</label>
-        <label><input type="checkbox" id="lvon" checked> แสดงภาพสดขณะรัน</label>
+        <label><input type="checkbox" id="lvon"> แสดงภาพสดขณะรัน</label>
       </div>
     </div>
 
@@ -156,7 +156,7 @@ canvas{max-width:100%;display:block;background:#000;border-radius:8px}
 
     <div id="livebox" class="card" hidden>
       <h2>ภาพที่ระบบตรวจเจอ</h2>
-      <div id="lvwrap">
+      <div id="lvwrap" hidden>
         <canvas id="lv" width="640" height="360"></canvas>
         <div id="lvt" class="mu" style="margin-top:6px"></div>
       </div>
@@ -255,6 +255,7 @@ const safe=s=>String(s).replace(/[\\/:*?"<>|\r\n\t]/g,'_').trim().slice(0,80)||'
 const csvq=s=>'"'+String(s??'').replace(/"/g,'""')+'"';
 const ZC={a:'245,165,36',b:'74,163,255'};
 const BADGE={wait:'รอคิว',run:'กำลังทำ',done:'เสร็จ',err:'ผิดพลาด'};
+const withTO=(p,ms,msg)=>Promise.race([p,new Promise((_,j)=>setTimeout(()=>j(new Error(msg)),ms))]);
 
 // ตารางรหัสประเภทรถ (ตรวจกับตารางทางการของกรมการขนส่งทางบกก่อนใช้จริง)
 const VCODE={'รถเก๋ง/รถนั่ง':'01','แท็กซี่':'07','รถกระบะ':'03','รถบรรทุกส่วนบุคคล':'35'};
@@ -324,6 +325,12 @@ function ensureVid(it,key){
     v.src=it.url;
   });
 }
+// ปล่อยวิดีโอเพื่อคืนหน่วยความจำและทรัพยากรถอดรหัส
+function releaseVid(it,key){
+  const v=it[key];if(!v)return;
+  try{v.pause();v.removeAttribute('src');v.load()}catch(e){}
+  it[key]=null;
+}
 function seek(v,t){return new Promise(r=>{
   const tt=Math.max(0,Math.min(t,v.duration-0.05));
   if(!v.seeking&&Math.abs(v.currentTime-tt)<0.001&&v.readyState>=2)return r();
@@ -331,11 +338,11 @@ function seek(v,t){return new Promise(r=>{
   const to=setTimeout(done,3000);
   v.addEventListener('seeked',done);v.currentTime=tt;
 })}
-// เรียงคิวต่อวิดีโอ + ลองใหม่หนึ่งครั้งถ้าดึงเฟรมไม่ได้
+// เรียงคิวต่อวิดีโอ + timeout + ลองใหม่หนึ่งครั้ง
 function getFrame(v,t){
   const job=async()=>{
     for(let k=0;k<2;k++){
-      try{await seek(v,t);return await createImageBitmap(v)}
+      try{await withTO(seek(v,t),4000,'seek timeout');return await withTO(createImageBitmap(v),4000,'bitmap timeout')}
       catch(e){if(k===1)throw e;await new Promise(r=>setTimeout(r,80))}
     }
   };
@@ -461,8 +468,13 @@ function evalTrack(C,t){
 }
 
 // ---------- ภาพสด & ภาพที่ตรวจเจอ ----------
+// กล่องภาพที่ตรวจเจอจะแสดงเมื่อ ติ๊กภาพสด หรือ มีภาพตัวอย่างที่ตรวจเจอแล้ว
+function refreshLiveBox(){
+  const on=$('lvon').checked;
+  $('lvwrap').hidden=!on;
+  $('livebox').hidden=!(on||$('evth').children.length);
+}
 function live(bmp,i,dets,C,it){
-  $('livebox').hidden=false;
   if(!$('lvon').checked)return;
   if(lv.width!==bmp.width||lv.height!==bmp.height){lv.width=bmp.width;lv.height=bmp.height}
   const w=bmp.width,h=bmp.height;
@@ -485,6 +497,7 @@ function addThumbCard(it,e){
   const d=document.createElement('div');d.className='th';
   d.innerHTML=`<img src="${e.thumb}" alt=""><div>${esc(it.name)}</div><div>${fmtT(e.e*it.step)}${e.ang?' · '+Math.round(e.ang)+'°':' · A→B'}</div>`;
   $('evth').prepend(d);
+  refreshLiveBox();
 }
 async function thumbNew(C,v,it){
   while(C.thumbed<C.evs.length){
@@ -507,7 +520,7 @@ function prog(it,i,n,t0,det,evn){
 }
 
 // ---------- จำแนกประเภทรถ & อ่านทะเบียน ----------
-async function getOcr(){if(!ocrW)ocrW=await Tesseract.createWorker('tha+eng');return ocrW}
+async function getOcr(){if(!ocrW)ocrW=await withTO(Tesseract.createWorker('tha+eng'),60000,'โหลด OCR ไม่สำเร็จ');return ocrW}
 const TH2AR={'๐':'0','๑':'1','๒':'2','๓':'3','๔':'4','๕':'5','๖':'6','๗':'7','๘':'8','๙':'9'};
 function prepPlate(src){
   const s=Math.min(3,Math.max(1,200/src.height)),c=document.createElement('canvas');
@@ -520,7 +533,7 @@ function prepPlate(src){
   x.putImageData(d,0,0);return c;
 }
 async function ocrPlate(src){
-  const w=await getOcr(),{data}=await w.recognize(prepPlate(src));
+  const w=await getOcr(),{data}=await withTO(w.recognize(prepPlate(src)),20000,'OCR timeout');
   const t=data.text.replace(/[๐-๙]/g,c=>TH2AR[c]);
   return{
     f:(t.match(/[ก-ฮ]{1,3}/)||[''])[0],
@@ -561,6 +574,8 @@ async function autoRead(it,e,v){
 
 // ---------- ประมวลผลวิดีโอหนึ่งไฟล์ ----------
 async function processItem(it){
+  // ปล่อยวิดีโอของไฟล์อื่นก่อน เพื่อไม่ให้ค้างทรัพยากรถอดรหัส
+  items.forEach(x=>{if(x!==it){releaseVid(x,'p');releaseVid(x,'r')}});
   const v=await ensureVid(it,'p'),o=S(),n=Math.max(1,Math.floor(v.duration/o.step));
   it.step=o.step;it.dur=v.duration;
   const C={tracks:[],evs:[],thumbed:0,Z:zonesOf(it.cat),o,W:v.videoWidth,H:v.videoHeight};
@@ -568,6 +583,7 @@ async function processItem(it){
   for(let i=0;i<n&&!stopF;i++){
     let bmp;
     try{bmp=await getFrame(v,i*o.step)}catch(err){console.warn('frame',i,err);continue}
+    if(i%60===0)console.log('กำลังดู',it.name,'เฟรม',i,'/',n);
     smx.drawImage(bmp,0,0,80,45);
     const d=smx.getImageData(0,0,80,45).data,g=new Uint8Array(3600);
     for(let k=0;k<3600;k++)g[k]=(d[k*4]+d[k*4+1]+d[k*4+2])/3;
@@ -576,7 +592,7 @@ async function processItem(it){
     prev=g;
     if(mv>o.mot)hang=o.hang;
     let dets=[];
-    if(hang>0){hang--;det++;dets=await detect(bmp,o.conf);update(C,i,dets,bmp)}
+    if(hang>0){hang--;det++;dets=await withTO(detect(bmp,o.conf),15000,'detect timeout');update(C,i,dets,bmp)}
     if(o.live&&(dets.length||i%4===0))live(bmp,i,dets,C,it);
     closeStale(C,i,false);
     await thumbNew(C,v,it);
@@ -587,6 +603,7 @@ async function processItem(it){
   await thumbNew(C,v,it);
   it.events=C.evs.sort((a,b)=>a.s-b.s).map(e=>({...e,ok:null,plate:{t:'',f:'',n:'',v:''},auto:null}));
   for(const e of it.events){try{await autoRead(it,e,v)}catch(err){console.warn('autoRead',err)}}
+  releaseVid(it,'p');
 }
 
 // ---------- คิว ----------
@@ -597,7 +614,6 @@ async function runQueue(cat){
   RUN={total:items.filter(i=>runnable(i,cat)).length,doneN:0};
   if(!RUN.total)return;
   running=true;stopF=false;updBtns();
-  $('livebox').hidden=false;
   while(!stopF){const it=items.find(i=>runnable(i,cat));if(!it)break;await runOne(it)}
   running=false;
   $('ovT').textContent=stopF?'หยุดแล้ว — ไฟล์ที่ยังไม่เสร็จจะกลับเข้าคิว':`เสร็จทั้งหมด ${RUN.doneN} ไฟล์`;
@@ -611,11 +627,12 @@ async function runOne(it){
     await processItem(it);
     if(stopF){it.status='wait';it.pct=0;it.events=[]}
     else{it.status='done';it.pct=100;RUN.doneN++}
-  }catch(e){console.error(e);it.status='err';it.err=e.message||String(e);RUN.doneN++}
+  }catch(e){console.error('ไฟล์',it.name,e);it.status='err';it.err=e.message||String(e);RUN.doneN++}
+  finally{releaseVid(it,'p')}
   renderQueue();renderStats();renderCats();updBtns();
 }
-$('runAll').onclick=()=>{$('evth').innerHTML='';runQueue(null)};
-$('runCat').onclick=()=>{$('evth').innerHTML='';runQueue(filterCat)};
+$('runAll').onclick=()=>{$('evth').innerHTML='';refreshLiveBox();runQueue(null)};
+$('runCat').onclick=()=>{$('evth').innerHTML='';refreshLiveBox();runQueue(filterCat)};
 $('stop').onclick=()=>{stopF=true;$('stop').textContent='กำลังหยุด…'};
 
 function addFiles(list){
@@ -666,6 +683,7 @@ $('qlist').addEventListener('change',e=>{
 $('qlist').addEventListener('click',e=>{
   const b=e.target.closest('[data-del]');if(!b)return;
   const it=items.find(i=>i.id==b.dataset.del);if(!it||it.status==='run')return;
+  releaseVid(it,'p');releaseVid(it,'r');
   if(it.url)URL.revokeObjectURL(it.url);
   items=items.filter(x=>x!==it);
   if(REV.id===it.id)REV={id:null,k:-1};
@@ -723,7 +741,7 @@ document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{
   if(b.dataset.v==='zones')zoneSync();
   if(b.dataset.v==='review'){renderReview();showRV()}
 });
-$('lvon').addEventListener('change',()=>{$('livebox').hidden=!$('lvon').checked&&!items.some(i=>i.status==='run')});
+$('lvon').addEventListener('change',()=>{refreshLiveBox();saveSet()});
 
 // ---------- ตรวจทาน ----------
 const curIt=()=>items.find(i=>i.id===REV.id);
@@ -757,6 +775,8 @@ function selectRV(id,k){REV={id,k};renderReview();showRV()}
 async function showRV(){
   const it=curIt(),e=curEv();
   if(!it||!e){vx.clearRect(0,0,vc.width,vc.height);$('info').textContent='';return}
+  if(running){$('info').textContent='กำลังประมวลผลอยู่ — กด Y/N ได้ ภาพจะแสดงเมื่อจบหรือหยุด';return}
+  items.forEach(x=>{if(x!==it)releaseVid(x,'r')});
   const v=await ensureVid(it,'r');
   const total=Math.max(0,Math.floor(v.duration/it.step)-1);
   $('sl').min=Math.max(0,e.s-10);$('sl').max=Math.min(total,e.e+10);
@@ -765,6 +785,7 @@ async function showRV(){
   drawPlate();
 }
 async function showFrame(i){
+  if(running)return;
   const tok=++showTok,it=curIt(),e=curEv();if(!it||!e)return;
   fi=i;$('sl').value=i;
   try{
@@ -780,6 +801,7 @@ async function showFrame(i){
   $('info').textContent=`${fmtT(i*it.step)}${i===e.s?' · จุดเริ่ม':''}${i===e.e?' · จุดจบ (เห็นทะเบียน)':''} — ${it.name}`;
 }
 async function drawPlate(){
+  if(running)return;
   const it=curIt(),e=curEv();if(!it||!e)return;
   const my=++plTok;
   let q=e.t[0];for(const p of e.t)if(Math.abs(p.i-e.e)<Math.abs(q.i-e.e))q=p;
@@ -897,6 +919,7 @@ window.onbeforeunload=e=>{if(running){e.preventDefault();e.returnValue=''}};
 $('provs').innerHTML=PROV.map(p=>`<option value="${p}">`).join('');
 $('pty').innerHTML='<option value="">ประเภทรถ...</option>'+VTYPES.map(t=>`<option value="${esc(t)}">${esc(t)}${VCODE[t]?' ('+VCODE[t]+')':''}</option>`).join('');
 loadSet();
+refreshLiveBox();
 renderAll();
 fetch('yolov8n.onnx').then(r=>r.ok?r.arrayBuffer():Promise.reject()).then(loadModel)
   .catch(()=>pill('เลือกไฟล์โมเดล yolov8n.onnx (ถ้าเปิดไฟล์โดยตรงจะโหลดให้อัตโนมัติไม่ได้)',false));
