@@ -127,7 +127,7 @@ catch(e){return alert(`เปิดวิดีโอไม่ได้ (รห�
   $('ss').max=Math.max(0,vN-1);$('ss').value=0;await showSample(0);gate()};
 async function loadModel(buf){
   try{ ort.env.wasm.wasmPaths='https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.1/dist/';
-  session=await ort.InferenceSession.create(buf,{executionProviders:['webgpu','wasm']});$('mst').textContent='โหลดโมเดลแล้ว ✓';gate()}
+  session=await ort.InferenceSession.create(buf,{executionProviders:['webgpu','wasm'],graphOptimizationLevel:'all'});$('mst').textContent='โหลดโมเดลแล้ว ✓';gate()}
   catch(e){$('mst').textContent='โหลดโมเดลไม่สำเร็จ: '+e.message}
 }
 fetch('yolov8n.onnx').then(r=>r.ok?r.arrayBuffer():Promise.reject()).then(loadModel).catch(()=>$('mst').textContent='เลือกไฟล์โมเดล .onnx (yolov8n)');
@@ -222,6 +222,7 @@ function live(bmp,i,dets,st){
 // ---------- วนประมวลผลทุกภาพ ----------
 function readP(){if(vid){VS=1/+$('vfps').value;vN=Math.floor(vid.duration/VS)}
   P={conf:+$('conf').value,mot:+$('mot').value/1000,ang:+$('ang').value,pre:+$('pre').value,post:+$('post').value,all:$('all').checked,hang:3,lost:8,minPts:3}
+}
 $('stop').onclick=()=>stopF=true;
 $('run').onclick=async()=>{
   readP();stopF=false;events=[];tracks=[];cur=-1;renderList();
@@ -236,9 +237,10 @@ $('run').onclick=async()=>{
     if(hang>0){hang--;det++;dets=await detect(bmp);update(i,dets);st='ตรวจพบรถ '+dets.length+' คัน'}
     if($('lvon').checked&&(dets.length||i%4==0)){live(bmp,i,dets,st);await new Promise(r=>setTimeout(r))}
     closeStale(i);bmp.close();
-    if(i%10==0){const sec=(performance.now()-t0)/1000;
-      $('pt').textContent=`${i+1}/${N()} · ตรวจรถ ${det} เฟรม · พบ ${events.length} เหตุการณ์ · ใช้เวลา ${sec.toFixed(0)} วิ`;
-      $('bar').firstChild.style.width=(i/N()*100)+'%';await new Promise(r=>setTimeout(r))}
+    if(i%5==0||i===N()-1){const pct=(i+1)/N()*100,sec=(performance.now()-t0)/1000,
+      eta=sec/(i+1)*(N()-i-1),tpos=vid?` · ตำแหน่งวิดีโอ ${fmtT(i*VS)}`:'';
+      $('pt').textContent=`${pct.toFixed(1)}% (${(i+1).toLocaleString()}/${N().toLocaleString()}) · ตรวจรถ ${det} เฟรม · พบ ${events.length} เหตุการณ์ · ผ่านไป ${sec.toFixed(0)} วิ · เหลืออีก ~${eta.toFixed(0)} วิ${tpos}`;
+      $('bar').firstChild.style.width=pct+'%';await new Promise(r=>setTimeout(r))}
   }
   closeStale(0,true);events.sort((a,b)=>a.s-b.s);renderList();
   $('pt').textContent=(stopF?'หยุดแล้ว · ':'เสร็จแล้ว · ')+`พบ ${events.length} เหตุการณ์ที่น่าสงสัย`;
