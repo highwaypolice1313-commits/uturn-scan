@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>คัดภาพรถกลับรถ</title>
-<script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.1/dist/ort.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.1/dist/ort.webgpu.min.js"></script>
 <style>
 :root{--bg:#0f1419;--p:#1a222c;--b:#2b3744;--t:#e6edf3;--m:#8b98a5;--a:#f5a524;--ok:#3fb950;--no:#f85149}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--t);font:15px/1.5 system-ui,'Sarabun',sans-serif}
@@ -35,7 +35,7 @@ select{background:#0f1419;color:var(--t);border:1px solid var(--b);border-radius
 <div id="t1">
 <section><h2>1. เลือกโฟลเดอร์ภาพและโมเดล</h2>
 <div class="row"><button id="pickDir" class="pri">เลือกโฟลเดอร์ภาพ</button><span id="dst" class="m">ยังไม่ได้เลือก</span></div>
-<div class="row"><button id="pickVid">หรือเลือกไฟล์วิดีโอ</button><label>ตรวจ <input type="number" id="vfps" value="5" min="1" max="30"> เฟรม/วินาที (วิดีโอเท่านั้น)</label></div>
+<div class="row"><button id="pickVid">หรือเลือกไฟล์วิดีโอ</button><label>ตรวจ <input type="number" id="vfps" value="2" min="1" max="30"> เฟรม/วินาที (วิดีโอเท่านั้น)</label></div>
 <div class="row"><input type="file" id="mf" accept=".onnx"><span id="mst" class="m">กำลังหาโมเดล yolov8n.onnx...</span></div></section>
 
 <section><h2>2. วาดโซน (คลิกวางจุดมุมบนภาพ · คลิกขวาลบจุดล่าสุด · ระบบจำโซนไว้)</h2>
@@ -52,7 +52,7 @@ select{background:#0f1419;color:var(--t);border:1px solid var(--b);border-radius
 <label><input type="checkbox" id="all"> ตรวจทุกเฟรม (ช้าลง)</label></div></section>
 
 <section><h2>3. ประมวลผล</h2>
-<div class="row"><button id="run" class="pri" disabled>เริ่มวิเคราะห์</button><button id="stop" disabled>หยุด</button><label><input type="checkbox" id="lvon" checked> แสดงภาพขณะวิ่ง</label><span id="pt" class="m"></span></div>
+<div class="row"><button id="run" class="pri" disabled>เริ่มวิเคราะห์</button><button id="stop" disabled>หยุด</button><label><input type="checkbox" id="lvon"> แสดงภาพขณะวิ่ง</label><span id="pt" class="m"></span></div>
 <div id="bar"><i></i></div>
 <div id="lt" class="m" style="margin:8px 0 4px"></div>
 <canvas id="lv" width="640" height="360"></canvas></section>
@@ -126,8 +126,8 @@ catch(e){return alert(`เปิดวิดีโอไม่ได้ (รห�
   $('dst').textContent=`${vfn} · ยาว ${fmtT(v.duration)} · จะตรวจ ${vN.toLocaleString()} เฟรม`;
   $('ss').max=Math.max(0,vN-1);$('ss').value=0;await showSample(0);gate()};
 async function loadModel(buf){
-  try{ort.env.wasm.wasmPaths='https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.1/dist/';
-  session=await ort.InferenceSession.create(buf,{executionProviders:['wasm']});$('mst').textContent='โหลดโมเดลแล้ว ✓';gate()}
+  try{ ort.env.wasm.wasmPaths='https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.1/dist/';
+  session=await ort.InferenceSession.create(buf,{executionProviders:['webgpu','wasm']});$('mst').textContent='โหลดโมเดลแล้ว ✓';gate()}
   catch(e){$('mst').textContent='โหลดโมเดลไม่สำเร็จ: '+e.message}
 }
 fetch('yolov8n.onnx').then(r=>r.ok?r.arrayBuffer():Promise.reject()).then(loadModel).catch(()=>$('mst').textContent='เลือกไฟล์โมเดล .onnx (yolov8n)');
@@ -221,7 +221,7 @@ function live(bmp,i,dets,st){
 
 // ---------- วนประมวลผลทุกภาพ ----------
 function readP(){if(vid){VS=1/+$('vfps').value;vN=Math.floor(vid.duration/VS)}
-  P={conf:+$('conf').value,mot:+$('mot').value/1000,ang:+$('ang').value,pre:+$('pre').value,post:+$('post').value,all:$('all').checked,hang:8,lost:15,minPts:5}}
+  P={conf:+$('conf').value,mot:+$('mot').value/1000,ang:+$('ang').value,pre:+$('pre').value,post:+$('post').value,all:$('all').checked,hang:3,lost:8,minPts:3}
 $('stop').onclick=()=>stopF=true;
 $('run').onclick=async()=>{
   readP();stopF=false;events=[];tracks=[];cur=-1;renderList();
