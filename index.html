@@ -1,365 +1,769 @@
 <!doctype html>
-<html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>คัดภาพรถกลับรถ</title>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>คัดภาพรถกลับรถ · หลายไฟล์</title>
 <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.1/dist/ort.webgpu.min.js"></script>
 <style>
-:root{--bg:#0f1419;--p:#1a222c;--b:#2b3744;--t:#e6edf3;--m:#8b98a5;--a:#f5a524;--ok:#3fb950;--no:#f85149}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--t);font:15px/1.5 system-ui,'Sarabun',sans-serif}
-main{max-width:1100px;margin:auto;padding:16px}h1{font-size:20px}h2{font-size:15px;margin:0 0 10px;color:var(--a)}
-section{background:var(--p);border:1px solid var(--b);border-radius:10px;padding:14px;margin-bottom:12px}
-button{background:#263341;color:var(--t);border:1px solid var(--b);border-radius:6px;padding:7px 12px;cursor:pointer;font:inherit}
-button.pri{background:var(--a);color:#111;border-color:var(--a);font-weight:600}button:disabled{opacity:.4;cursor:default}
-input[type=number]{width:72px;background:#0f1419;color:var(--t);border:1px solid var(--b);border-radius:5px;padding:4px}
-.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:6px 0}.m{color:var(--m);font-size:13px}
-canvas{max-width:100%;display:block;background:#000;border-radius:6px}#zc{cursor:crosshair}
-#bar{height:8px;background:#0f1419;border-radius:4px;overflow:hidden}#bar i{display:block;height:100%;width:0;background:var(--a)}
-#rv{display:grid;grid-template-columns:230px 1fr;gap:12px}#list{max-height:480px;overflow:auto}
-.ev{padding:6px 8px;border-radius:6px;cursor:pointer;border-left:4px solid var(--b);font-size:13px}
-.ev.sel{background:#263341}.ev.y{border-color:var(--ok)}.ev.n{border-color:var(--no);opacity:.55}
-@media(max-width:760px){#rv{grid-template-columns:1fr}}
-input[type=text]{background:#0f1419;color:var(--t);border:1px solid var(--b);border-radius:5px;padding:6px 8px;font:inherit}
-select{background:#0f1419;color:var(--t);border:1px solid var(--b);border-radius:5px;padding:6px;font:inherit;max-width:100%}
-#plate{display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:12px;margin:10px 0}
-@media(max-width:760px){#plate{grid-template-columns:1fr}}
+:root{--bg:#0b1016;--sf:#131b24;--sf2:#1a2430;--bd:#243140;--tx:#e6edf3;--mu:#8393a3;--ac:#f5a524;--ok:#3fb950;--no:#f85149;--bl:#4aa3ff;--r:12px}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:14px/1.5 system-ui,'Sarabun','Segoe UI',sans-serif;min-height:100vh}
+header{display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:12px 20px;border-bottom:1px solid var(--bd);background:var(--sf);position:sticky;top:0;z-index:5}
+header h1{font-size:18px;margin:0;flex:1 1 auto}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{background:var(--sf2);border:1px solid var(--bd);border-radius:999px;padding:4px 12px;font-size:13px;color:var(--mu)}
+.chip b{color:var(--tx);font-weight:600}
+.pill{padding:4px 12px;border-radius:999px;font-size:13px;background:#2a2112;color:var(--ac)}
+.pill.ok{background:#11261a;color:var(--ok)}
+.layout{display:grid;grid-template-columns:240px minmax(0,1fr);min-height:calc(100vh - 62px)}
+aside{border-right:1px solid var(--bd);background:var(--sf);padding:14px;display:flex;flex-direction:column;gap:6px}
+aside h3{font-size:12px;color:var(--mu);margin:6px 0 4px;font-weight:600}
+.cat{display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border-radius:8px;cursor:pointer;border:1px solid transparent}
+.cat:hover{background:var(--sf2)}
+.cat.on{background:var(--sf2);border-color:var(--ac)}
+.cat small{color:var(--mu)}
+main{padding:18px 22px;min-width:0}
+.tabs{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}
+.tab.on{background:var(--ac);color:#111;border-color:var(--ac);font-weight:600}
+button{background:var(--sf2);color:var(--tx);border:1px solid var(--bd);border-radius:8px;padding:7px 14px;cursor:pointer;font:inherit}
+button:hover:not(:disabled){border-color:#3a4a5e}
+button.pri{background:var(--ac);color:#111;border-color:var(--ac);font-weight:600}
+button.dng{color:var(--no)}
+button:disabled{opacity:.4;cursor:default}
+button.icon{padding:5px 9px}
+input,select{background:#0b1016;color:var(--tx);border:1px solid var(--bd);border-radius:8px;padding:6px 8px;font:inherit;min-width:0}
+input[type=number]{width:76px}
+.card{background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);padding:16px;margin-bottom:14px}
+.card h2{font-size:15px;margin:0 0 12px}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.mu{color:var(--mu);font-size:13px}
+.empty{padding:30px;text-align:center;color:var(--mu)}
+.drop{border:2px dashed var(--bd);border-radius:var(--r);padding:28px;text-align:center;background:#0e1620;transition:.15s}
+.drop.on{border-color:var(--ac);background:#1a1608}
+.bar{height:7px;background:#0b1016;border-radius:99px;overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--ac),#ffcf6b);transition:width .3s}
+.bar.big{height:12px;margin:10px 0 4px}
+.qi{display:grid;grid-template-columns:minmax(0,1fr) 170px 150px 86px 36px;gap:12px;align-items:center;padding:10px 12px;border:1px solid var(--bd);background:var(--sf2);border-radius:10px;margin-bottom:8px}
+.fn{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600}
+.st{font-size:12px;padding:3px 9px;border-radius:999px;background:#222c38;color:var(--mu);text-align:center}
+.st.run{background:#10243a;color:var(--bl)}
+.st.done{background:#11261a;color:var(--ok)}
+.st.err{background:#2a1214;color:var(--no)}
+canvas{max-width:100%;display:block;background:#000;border-radius:8px}
+#zc{cursor:crosshair}
+.rv{display:grid;grid-template-columns:300px minmax(0,1fr);gap:14px;align-items:start}
+.evpane{max-height:72vh;overflow:auto;padding:10px}
+.gh{font-size:12px;color:var(--ac);margin:10px 4px 6px;font-weight:600}
+.ev{padding:8px 10px;border-radius:8px;cursor:pointer;border-left:3px solid var(--bd);margin-bottom:4px;font-size:13px;background:var(--sf2)}
+.ev.sel{outline:1px solid var(--ac)}
+.ev.y{border-left-color:var(--ok)}
+.ev.n{border-left-color:var(--no);opacity:.55}
+.plate{display:grid;grid-template-columns:minmax(0,1fr) 250px;gap:14px;margin-top:14px}
+.plate .f{display:flex;flex-direction:column;gap:8px}
+.plate input,.plate select{width:100%}
+.view[hidden]{display:none}
+@media(max-width:900px){
+  .layout,.rv{grid-template-columns:1fr}
+  aside{border-right:0;border-bottom:1px solid var(--bd)}
+  .plate{grid-template-columns:1fr}
+  .qi{grid-template-columns:1fr 1fr}
+}
+</style>
+</head>
+<body>
 
-.tabs{display:flex;gap:6px;margin:10px 0}.tabs button.on,#qb0.on,#qb1.on,#qb2.on{background:var(--a);color:#111;border-color:var(--a);font-weight:600}
-.g2{display:grid;grid-template-columns:230px 1fr;gap:12px}@media(max-width:760px){.g2{grid-template-columns:1fr}}
-.drop{border:2px dashed var(--b);border-radius:8px;padding:16px;text-align:center;color:var(--m);margin-top:8px}.drop.on{border-color:var(--a);color:var(--t)}
-.zv{position:relative;overflow:hidden;background:#000;border-radius:6px;height:min(60vh,460px);cursor:grab;touch-action:none}
-.zv img{position:absolute;left:0;top:0;transform-origin:0 0;max-width:none;user-select:none;-webkit-user-drag:none}
-</style></head><body><main>
-<h1>คัดภาพรถกลับรถ</h1>
-<p class="m">ประมวลผลในเครื่องทั้งหมด ภาพไม่ถูกส่งออกไปไหน · ใช้ได้กับ Chrome / Edge เท่านั้น</p>
+<header>
+  <h1>คัดภาพรถกลับรถ <span class="mu">· หลายไฟล์</span></h1>
+  <div class="chips">
+    <span class="chip">วิดีโอ <b id="sV">0</b></span>
+    <span class="chip">เสร็จ <b id="sD">0</b></span>
+    <span class="chip">เหตุการณ์ <b id="sE">0</b></span>
+    <span class="chip">ยืนยันแล้ว <b id="sY">0</b></span>
+  </div>
+  <span id="mpill" class="pill">กำลังโหลดโมเดล…</span>
+  <button id="pickModel">เปลี่ยนโมเดล</button>
+  <input type="file" id="mf" accept=".onnx" hidden>
+</header>
 
-<div class="tabs"><button id="tab1" class="on">1. คัดกลับรถ</button><button id="tab2">2. บันทึกทะเบียน PTM</button></div>
-<div id="t1">
-<section><h2>1. เลือกโฟลเดอร์ภาพและโมเดล</h2>
-<div class="row"><button id="pickDir" class="pri">เลือกโฟลเดอร์ภาพ</button><span id="dst" class="m">ยังไม่ได้เลือก</span></div>
-<div class="row"><button id="pickVid">หรือเลือกไฟล์วิดีโอ</button><label>ตรวจ <input type="number" id="vfps" value="2" min="1" max="30"> เฟรม/วินาที (วิดีโอเท่านั้น)</label></div>
-<div class="row"><input type="file" id="mf" accept=".onnx"><span id="mst" class="m">กำลังหาโมเดล yolov8n.onnx...</span></div></section>
+<div class="layout">
+<aside>
+  <h3>หมวดหมู่ (กล้อง / จุดเกิดเหตุ)</h3>
+  <div id="cats"></div>
+  <div class="row" style="margin-top:8px">
+    <input id="newCat" placeholder="ชื่อหมวดใหม่" style="flex:1">
+    <button id="addCat">เพิ่ม</button>
+  </div>
+  <div class="mu" style="margin-top:14px">คลิกหมวดเพื่อกรองคิวและผลลัพธ์ วิดีโอใหม่จะเข้าหมวดที่เลือกอยู่ โซนกลับรถก็แยกตามหมวด</div>
+</aside>
 
-<section><h2>2. วาดโซน (คลิกวางจุดมุมบนภาพ · คลิกขวาลบจุดล่าสุด · ระบบจำโซนไว้)</h2>
-<div class="row"><button id="za">วาดโซนเริ่มกลับรถ (A)</button><button id="zb">วาดโซนจบ ที่เห็นทะเบียน (B)</button>
-<span class="m">รถที่ผ่านโซน A แล้วไปโซน B ตามลำดับ = เหตุการณ์</span></div>
-<div class="row"><span class="m">ภาพตัวอย่าง</span><input type="range" id="ss" min="0" value="0" style="flex:1"><button id="zr">ล้างโซนทั้งหมด</button></div>
-<canvas id="zc" width="640" height="360"></canvas>
-<div class="row">
-<label>ความมั่นใจ <input type="number" id="conf" value="0.35" step="0.05" min="0.1" max="0.9"></label>
-<label>ความไวตัดเฟรมว่าง <input type="number" id="mot" value="4" step="1" min="1"></label>
-<label>มุมกลับรถ ≥ <input type="number" id="ang" value="120" min="60" max="180">°</label>
-<label>เผื่อก่อน <input type="number" id="pre" value="3" min="0"></label>
-<label>เผื่อหลัง <input type="number" id="post" value="2" min="0"></label>
-<label><input type="checkbox" id="all"> ตรวจทุกเฟรม (ช้าลง)</label></div></section>
+<main>
+  <div class="tabs">
+    <button class="tab on" data-v="queue">1. คิววิดีโอ</button>
+    <button class="tab" data-v="zones">2. โซนกลับรถ</button>
+    <button class="tab" data-v="review">3. ตรวจทานและส่งออก</button>
+  </div>
 
-<section><h2>3. ประมวลผล</h2>
-<div class="row"><button id="run" class="pri" disabled>เริ่มวิเคราะห์</button><button id="stop" disabled>หยุด</button><label><input type="checkbox" id="lvon"> แสดงภาพขณะวิ่ง</label><span id="pt" class="m"></span></div>
-<div id="bar"><i></i></div>
-<div id="lt" class="m" style="margin:8px 0 4px"></div>
-<canvas id="lv" width="640" height="360"></canvas></section>
+  <!-- ===== คิว ===== -->
+  <section class="view" id="v-queue">
+    <div class="card">
+      <div id="drop" class="drop">
+        ลากวิดีโอหลายไฟล์มาวางที่นี่
+        <div class="mu">mp4 / mov / webm — ถ้าเล่นไม่ได้ให้แปลงเป็น H.264 ก่อน</div>
+        <div class="row" style="justify-content:center;margin-top:12px">
+          <button id="pickFiles" class="pri">เลือกไฟล์วิดีโอ</button>
+          <button id="pickDir">เลือกทั้งโฟลเดอร์</button>
+        </div>
+      </div>
+      <input type="file" id="vfile" accept="video/*,.mkv,.avi" multiple hidden>
+      <div class="row" style="margin-top:12px">
+        <label class="mu">เพิ่มเข้าหมวด <select id="catSel"></select></label>
+      </div>
+    </div>
 
-<section><h2>4. ตรวจทาน <span id="cnt" class="m"></span></h2>
-<div id="rv"><div id="list"></div><div>
-<canvas id="vc" width="640" height="360"></canvas>
-<input type="range" id="sl" style="width:100%" min="0" max="0" value="0">
-<div id="info" class="m"></div>
-<div id="plate"><canvas id="pc" width="480" height="270"></canvas><div>
-<div class="m">ข้อมูลสำหรับกรอกใน PTM · Enter = ช่องถัดไป / ยืนยัน</div>
-<div class="row"><select id="pty"><option value="">ประเภทรถ...</option><option>รถเก๋ง/รถนั่ง</option><option>รถกระบะ</option><option>รถตู้</option><option>รถบรรทุก</option><option>รถโดยสาร</option><option>รถจักรยานยนต์</option><option>อื่นๆ</option></select></div>
-<div class="row"><input type="text" id="pf" placeholder="หมวด เช่น กข" size="7"> - <input type="text" id="pn" placeholder="เลข" size="7"></div>
-<div class="row"><input type="text" id="pv" list="provs" placeholder="จังหวัด" size="16"><datalist id="provs"></datalist></div>
-<div class="row"><button id="c1">คัดลอกหมวด</button><button id="c2">คัดลอกเลข</button><button id="c3">คัดลอกจังหวัด</button></div>
-</div></div>
-<div class="row"><button id="by" class="pri">ใช่ (Y)</button><button id="bn">ไม่ใช่ (N)</button>
-<button id="bs">ตั้งเป็นจุดเริ่ม ([)</button><button id="be">ตั้งเป็นจุดจบ (])</button></div>
-<div class="m">← → เลื่อนเฟรม · ↑ ↓ เปลี่ยนเหตุการณ์ · เส้นเขียวคือเส้นทางรถ กรอบส้มคือรถในเฟรมนั้น</div>
-</div></div>
-<div class="row"><label><input type="checkbox" id="exall"> ส่งออกทุกภาพในช่วง (ไม่ติ๊ก = 3 ภาพ: ก่อน / ระหว่าง / ทะเบียน · ไม่มีกรอบ)</label><button id="ex" class="pri" disabled>ส่งออกเหตุการณ์ที่ยืนยันแล้ว</button><button id="tosend">ส่งไปแท็บบันทึกทะเบียน</button><span id="exs" class="m"></span></div></section>
-</div>
-<div id="t2" hidden>
-<section><h2>บันทึกทะเบียนส่งเข้า PTM</h2>
-<div class="row"><button id="qadd" class="pri">เพิ่มภาพ</button><input type="file" id="qfile" accept="image/*" multiple hidden>
-<label><input type="checkbox" id="qpair"> จับกลุ่มทีละ 3 ภาพ (ก่อน, ระหว่าง, ทะเบียน — เรียงตามชื่อไฟล์)</label>
-<a href="ptm-fill.user.js" class="m">ติดตั้งสคริปต์เติม PTM</a></div>
-<div id="qdrop" class="drop">ลากภาพมาวางที่นี่ หรือกด Ctrl+V เพื่อวางภาพ · เพิ่มทีละคันหรือหลายภาพพร้อมกันก็ได้</div></section>
-<section><div class="g2"><div id="qlist" style="max-height:520px;overflow:auto"></div>
-<div>
-<div class="row"><button id="qb0">1 ก่อน</button><button id="qb1">2 ระหว่าง</button><button id="qb2">3 ทะเบียน</button><button id="zin">＋</button><button id="zout">－</button><button id="zfit">พอดีจอ</button><span class="m">ล้อเมาส์ซูม · ลากเพื่อเลื่อน</span></div>
-<div id="qzv" class="zv"><img id="qimg" alt=""></div>
-<div class="row" style="margin-top:10px"><input type="text" id="qt" list="tys" placeholder="ประเภทรถ" size="18"><datalist id="tys"></datalist>
-<input type="text" id="qf" placeholder="หมวด" size="6" maxlength="3"> - <input type="text" id="qn" placeholder="เลข" size="6" maxlength="4">
-<input type="text" id="qv" list="provs" placeholder="จังหวัด" size="16"></div>
-<div class="row"><button id="qsend" class="pri">คัดลอกส่ง PTM (Enter)</button><button id="qskip">ข้าม</button><button id="qdel">ลบรายการ</button><button id="qcsv">ดาวน์โหลดสรุป CSV</button><span id="qst" class="m"></span></div>
-<div class="m">วิธีใช้: กรอกหมวด → เลข → จังหวัด แล้วกด Enter (ระบบคัดลอกข้อมูล) → สลับไปแท็บ PTM สคริปต์จะเติมฟอร์มและกดตรวจสอบให้ → เทียบรูปกับข้อมูลรถ แล้วลากรูปใส่ช่องอัปโหลดเอง</div>
-</div></div></section></div>
+    <div class="card">
+      <h2>ตั้งค่าการตรวจ</h2>
+      <div class="row">
+        <label>ตรวจทุก <input type="number" id="step" value="0.5" step="0.5" min="0.2"> วินาที</label>
+        <label>ความมั่นใจ <input type="number" id="conf" value="0.35" step="0.05" min="0.1" max="0.9"></label>
+        <label>ความไวตัดเฟรมว่าง <input type="number" id="mot" value="4" min="1"></label>
+        <label>มุมกลับรถ ≥ <input type="number" id="ang" value="120" min="60" max="180">°</label>
+        <label>เผื่อก่อน <input type="number" id="pre" value="2" min="0"> วิ</label>
+        <label>เผื่อหลัง <input type="number" id="post" value="2" min="0"> วิ</label>
+        <label><input type="checkbox" id="lvon"> แสดงภาพสดขณะรัน</label>
+      </div>
+      <div class="mu" style="margin-top:6px">ตรวจทุก 1 วินาทีจะเร็วขึ้นมาก เฟรมที่ไม่มีการเคลื่อนไหวจะถูกข้ามอัตโนมัติ</div>
+    </div>
+
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <h2 style="margin:0">คิวงาน <span id="qcount" class="mu"></span></h2>
+        <div class="row">
+          <button id="runCat">เริ่มเฉพาะหมวด</button>
+          <button id="runAll" class="pri">เริ่มทั้งหมด</button>
+          <button id="stop" class="dng">หยุด</button>
+        </div>
+      </div>
+      <div class="bar big"><i id="ovBar"></i></div>
+      <div id="ovT" class="mu" style="margin-bottom:12px"></div>
+      <div id="qlist"></div>
+    </div>
+
+    <div id="livebox" class="card" hidden>
+      <canvas id="lv" width="640" height="360"></canvas>
+      <div id="lvt" class="mu" style="margin-top:6px"></div>
+    </div>
+  </section>
+
+  <!-- ===== โซน ===== -->
+  <section class="view" id="v-zones" hidden>
+    <div class="card">
+      <h2>วาดโซนกลับรถต่อหมวด</h2>
+      <div class="mu">โซน A = จุดที่รถเริ่มกลับรถ · โซน B = จุดที่เห็นทะเบียน ถ้าไม่วาด B ระบบจะใช้มุมกลับรถอย่างเดียว · คลิกซ้ายวางจุด คลิกขวาลบจุดล่าสุด</div>
+      <div class="row" style="margin:12px 0">
+        <label>หมวด <select id="zcat"></select></label>
+        <label>ภาพตัวอย่างจาก <select id="zsrc"></select></label>
+      </div>
+      <div class="row" style="margin-bottom:10px">
+        <button id="za">วาดโซน A</button>
+        <button id="zb">วาดโซน B</button>
+        <button id="zdone">เสร็จ</button>
+        <button id="zr" class="dng">ล้างโซนของหมวดนี้</button>
+        <span id="zmsg" class="mu"></span>
+      </div>
+      <canvas id="zc" width="640" height="360"></canvas>
+    </div>
+  </section>
+
+  <!-- ===== ตรวจทาน ===== -->
+  <section class="view" id="v-review" hidden>
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <div class="row">
+          <label>หมวด <select id="rvCat"></select></label>
+          <label><input type="checkbox" id="rvOnly" checked> เฉพาะที่ยังไม่ตรวจ</label>
+          <span id="rvcnt" class="mu"></span>
+        </div>
+        <div class="row">
+          <label><input type="checkbox" id="exall"> ส่งออกทุกภาพในช่วง</label>
+          <button id="exp" class="pri" disabled>ส่งออกที่ยืนยันแล้ว</button>
+          <span id="exs" class="mu"></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="rv">
+      <div class="card evpane"><div id="evl"></div></div>
+      <div>
+        <div class="card">
+          <canvas id="vc" width="640" height="360"></canvas>
+          <input type="range" id="sl" style="width:100%;margin-top:8px">
+          <div id="info" class="mu" style="margin:4px 0 10px"></div>
+          <div class="row">
+            <button id="by" class="pri">ใช่ (Y)</button>
+            <button id="bn" class="dng">ไม่ใช่ (N)</button>
+            <button id="bs">ตั้งจุดเริ่ม [</button>
+            <button id="be">ตั้งจุดจบ ]</button>
+          </div>
+          <div class="mu" style="margin-top:8px">← → เลื่อนเฟรม · ↑ ↓ เปลี่ยนเหตุการณ์ · Y/N ยืนยันแล้วไปรายการถัดไปอัตโนมัติ</div>
+        </div>
+
+        <div class="card plate">
+          <canvas id="pc" width="480" height="270"></canvas>
+          <div class="f">
+            <select id="pty">
+              <option value="">ประเภทรถ...</option>
+              <option>รถเก๋ง/รถนั่ง</option><option>รถกระบะ</option><option>รถตู้</option>
+              <option>รถบรรทุก</option><option>รถโดยสาร</option><option>รถจักรยานยนต์</option><option>อื่นๆ</option>
+            </select>
+            <div class="row">
+              <input id="pf" placeholder="หมวด เช่น กข" style="width:90px">
+              <span>-</span>
+              <input id="pn" placeholder="เลข" style="flex:1">
+            </div>
+            <input id="pv" list="provs" placeholder="จังหวัด">
+            <datalist id="provs"></datalist>
+            <div class="row">
+              <button id="c1">คัดลอกหมวด</button>
+              <button id="c2">คัดลอกเลข</button>
+              <button id="c3">คัดลอกจังหวัด</button>
+            </div>
+            <button id="cptm">คัดลอกส่ง PTM</button>
+            <div class="mu">Enter = ยืนยันและไปรายการถัดไป</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
 </main>
+</div>
+
 <script>
 const $=id=>document.getElementById(id);
-let files=[],session=null,zones=JSON.parse(localStorage.zones||'{}'),sample=null,drag=null,W=640,H=360,P={},stopF=false;
-let events=[],tracks=[],curBmp=null,cur=-1,fi=0;
-const zc=$('zc'),zx=zc.getContext('2d'),vc=$('vc'),vx=vc.getContext('2d');
-let vid=null,vfn='',vN=0,VS=0.2; // โหมดวิดีโอ: ตรวจทุก VS วินาที
-const N=()=>vid?vN:files.length,pad=x=>String(x).padStart(2,'0');
-const fmtT=(t,sep=':')=>pad(Math.floor(t/3600))+sep+pad(Math.floor(t%3600/60))+sep+pad(Math.floor(t%60))+(sep==':'?'.':'_')+Math.floor(t*10%10);
-const nm=i=>vid?vfn+' '+fmtT(i*VS):files[i].name;
-const seek=t=>new Promise(r=>{t=Math.min(t,vid.duration-0.05);
-  if(!vid.seeking&&Math.abs(vid.currentTime-t)<1e-3&&vid.readyState>=2)return r();
-  vid.onseeked=()=>r();vid.currentTime=t});
-const getBmp=async i=>{if(!vid)return createImageBitmap(await files[i].getFile());await seek(i*VS);return createImageBitmap(vid)};
-const ang=(a,b)=>Math.acos(Math.max(-1,Math.min(1,(a[0]*b[0]+a[1]*b[1])/(Math.hypot(...a)*Math.hypot(...b)||1))))*180/Math.PI;
+const pad=x=>String(x).padStart(2,'0');
+const fmtT=s=>{s=Math.max(0,s);return pad(Math.floor(s/3600))+':'+pad(Math.floor(s%3600/60))+':'+pad(Math.floor(s%60))};
+const fmtSec=s=>s<60?Math.round(s)+' วิ':Math.floor(s/60)+' นาที '+Math.round(s%60)+' วิ';
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const safe=s=>String(s).replace(/[\\/:*?"<>|\r\n\t]/g,'_').trim().slice(0,80)||'x';
+const csvq=s=>'"'+String(s??'').replace(/"/g,'""')+'"';
+const ZC={a:'245,165,36',b:'74,163,255'};
+const BADGE={wait:'รอคิว',run:'กำลังทำ',done:'เสร็จ',err:'ผิดพลาด'};
+const PROV='กรุงเทพมหานคร กระบี่ กาญจนบุรี กาฬสินธุ์ กำแพงเพชร ขอนแก่น จันทบุรี ฉะเชิงเทรา ชลบุรี ชัยนาท ชัยภูมิ ชุมพร เชียงราย เชียงใหม่ ตรัง ตราด ตาก นครนายก นครปฐม นครพนม นครราชสีมา นครศรีธรรมราช นครสวรรค์ นนทบุรี นราธิวาส น่าน บึงกาฬ บุรีรัมย์ ปทุมธานี ประจวบคีรีขันธ์ ปราจีนบุรี ปัตตานี พระนครศรีอยุธยา พะเยา พังงา พัทลุง พิจิตร พิษณุโลก เพชรบุรี เพชรบูรณ์ แพร่ ภูเก็ต มหาสารคาม มุกดาหาร แม่ฮ่องสอน ยโสธร ยะลา ร้อยเอ็ด ระนอง ระยอง ราชบุรี ลพบุรี ลำปาง ลำพูน เลย ศรีสะเกษ สกลนคร สงขลา สตูล สมุทรปราการ สมุทรสงคราม สมุทรสาคร สระแก้ว สระบุรี สิงห์บุรี สุโขทัย สุพรรณบุรี สุราษฎร์ธานี สุรินทร์ หนองคาย หนองบัวลำภู อ่างทอง อำนาจเจริญ อุดรธานี อุตรดิตถ์ อุทัยธานี อุบลราชธานี'.split(' ');
 
-// ---------- โหลดโฟลเดอร์ / โมเดล ----------
-$('pickDir').onclick=async()=>{
-  if(!window.showDirectoryPicker)return alert('ต้องใช้ Chrome หรือ Edge');
-  const d=await showDirectoryPicker();vid=null;files=[];
-  for await(const [n,h] of d.entries())if(h.kind==='file'&&/\.(jpe?g|png|bmp|webp)$/i.test(n))files.push(h);
-  files.sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true}));
-  $('dst').textContent=`${d.name} · ${N().toLocaleString()} ภาพ`;
-  $('ss').max=Math.max(0,N()-1);$('ss').value=0;await showSample(0);gate();
-};
-$('pickVid').onclick=async()=>{
-  if(!window.showOpenFilePicker)return alert('ต้องใช้ Chrome หรือ Edge');
-  const [h]=await showOpenFilePicker({types:[{description:'วิดีโอ',accept:{'video/*':['.mp4','.mov','.mkv','.webm','.m4v','.avi']}}]});
-  const f=await h.getFile(),v=document.createElement('video');v.muted=true;v.preload='auto';v.src=URL.createObjectURL(f);
-try{await new Promise((r,j)=>{v.onloadeddata=r;v.onerror=()=>j(v.error)})}
-catch(e){return alert(`เปิดวิดีโอไม่ได้ (รหัส ${e?.code||'?'}) — มักเป็นโคเดกที่ Chrome ไม่รองรับ เช่น H.265/HEVC, MKV, AVI\nลองแปลงเป็น MP4 (H.264) ก่อน`)}
-  vid=v;vfn=f.name;files=[];VS=1/+$('vfps').value;vN=Math.floor(v.duration/VS);
-  $('dst').textContent=`${vfn} · ยาว ${fmtT(v.duration)} · จะตรวจ ${vN.toLocaleString()} เฟรม`;
-  $('ss').max=Math.max(0,vN-1);$('ss').value=0;await showSample(0);gate()};
-async function loadModel(buf){
-  try{ ort.env.wasm.wasmPaths='https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.1/dist/';
-  session=await ort.InferenceSession.create(buf,{executionProviders:['webgpu','wasm'],graphOptimizationLevel:'all'});$('mst').textContent='โหลดโมเดลแล้ว ✓';gate()}
-  catch(e){$('mst').textContent='โหลดโมเดลไม่สำเร็จ: '+e.message}
-}
-fetch('yolov8n.onnx').then(r=>r.ok?r.arrayBuffer():Promise.reject()).then(loadModel).catch(()=>$('mst').textContent='เลือกไฟล์โมเดล .onnx (yolov8n)');
-$('mf').onchange=async e=>{if(e.target.files[0])loadModel(await e.target.files[0].arrayBuffer())};
-const gate=()=>$('run').disabled=!(N()&&session);
+let items=[],uid=0,filterCat='all',running=false,stopF=false,session=null,RUN={total:0,doneN:0};
+let cats=JSON.parse(localStorage.uCats||'null')||['ทั่วไป'];
+let zonesAll=JSON.parse(localStorage.uZones||'{}');
+let REV={id:null,k:-1},fi=0,flat=[],showTok=0,plTok=0,lastType='',zk=null,zSample=null;
 
-// ---------- โซนกลับรถ ----------
-async function showSample(i){sample=await getBmp(i);W=sample.width;H=sample.height;zc.width=W;zc.height=H;drawZone()}
-let zk=null;const ZC={a:'245,165,36',b:'74,163,255'},saveZ=()=>localStorage.zones=JSON.stringify(zones);
-const poly=(c,z,W2,H2)=>{c.beginPath();z.forEach(([x,y],i)=>i?c.lineTo(x*W2,y*H2):c.moveTo(x*W2,y*H2));if(z.length>2)c.closePath()};
-function drawZone(){zx.drawImage(sample,0,0);
-  for(const k of['a','b']){const z=zones[k];if(!z||!z.length)continue;
-    poly(zx,z,W,H);zx.fillStyle=`rgba(${ZC[k]},.25)`;zx.strokeStyle=`rgb(${ZC[k]})`;zx.lineWidth=Math.max(2,W/400);
-    if(z.length>2)zx.fill();zx.stroke();zx.fillStyle=`rgb(${ZC[k]})`;
-    z.forEach(([x,y])=>{zx.beginPath();zx.arc(x*W,y*H,Math.max(4,W/200),0,7);zx.fill()});
-    zx.font=`bold ${Math.round(W/28)}px sans-serif`;zx.fillText(k.toUpperCase(),z[0][0]*W+8,z[0][1]*H-8)}}
-const pos=e=>{const r=zc.getBoundingClientRect();return[(e.clientX-r.left)/r.width,(e.clientY-r.top)/r.height]};
-zc.onclick=e=>{if(!sample||!zk)return;zones[zk].push(pos(e));saveZ();drawZone()};
-zc.oncontextmenu=e=>{e.preventDefault();if(zk&&zones[zk].length){zones[zk].pop();saveZ();drawZone()}};
-$('za').onclick=()=>{zk='a';zones.a=[];saveZ();if(sample)drawZone()};
-$('zb').onclick=()=>{zk='b';zones.b=[];saveZ();if(sample)drawZone()};
-$('zr').onclick=()=>{zones={};zk=null;saveZ();if(sample)drawZone()};
-$('ss').oninput=e=>showSample(+e.target.value);
-function inZ(q,z){if(!z||z.length<3)return false;const x=q.cx/W,y=q.b.y2/H;let c=false; // ใช้จุดกลางล่างของกรอบรถ (ตำแหน่งล้อ)
-  for(let i=0,j=z.length-1;i<z.length;j=i++){const[xi,yi]=z[i],[xj,yj]=z[j];if((yi>y)!==(yj>y)&&x<(xj-xi)*(y-yi)/(yj-yi)+xi)c=!c}return c}
-const hasAB=()=>zones.a&&zones.a.length>2&&zones.b&&zones.b.length>2;
-const inZone=p=>!(zones.a&&zones.a.length>2)||inZ(p,zones.a);
+const ang=(a,b)=>Math.acos(Math.max(-1,Math.min(1,(a[0]*b[0]+a[1]*b[1])/((Math.hypot(...a)*Math.hypot(...b))||1))))*180/Math.PI;
+const poly=(c,z,w,h)=>{c.beginPath();z.forEach(([x,y],i)=>i?c.lineTo(x*w,y*h):c.moveTo(x*w,y*h));if(z.length>2)c.closePath()};
+const S=()=>({step:Math.max(0.2,+$('step').value||0.5),conf:+$('conf').value||0.35,mot:(+$('mot').value||4)/1000,ang:+$('ang').value||120,pre:+$('pre').value||0,post:+$('post').value||0,lost:8,minPts:3,hang:3,live:$('lvon').checked,all:$('exall').checked});
 
-// ---------- ตรวจจับรถ (YOLOv8 ONNX) ----------
-const cv=document.createElement('canvas');cv.width=cv.height=640;const cx=cv.getContext('2d',{willReadFrequently:true});
+// canvas ทำงานเบื้องหลัง
+const cvs=document.createElement('canvas');cvs.width=cvs.height=640;const dctx=cvs.getContext('2d',{willReadFrequently:true});
 const sm=document.createElement('canvas');sm.width=80;sm.height=45;const smx=sm.getContext('2d',{willReadFrequently:true});
-const sc2=document.createElement('canvas'),sx=sc2.getContext('2d',{willReadFrequently:true});
+const sc2=document.createElement('canvas'),shx=sc2.getContext('2d',{willReadFrequently:true});
+const vc=$('vc'),vx=vc.getContext('2d'),zc=$('zc'),lv=$('lv'),lctx=lv.getContext('2d');
+
+// ---------- โมเดล ----------
+function pill(t,ok){const p=$('mpill');p.textContent=t;p.className='pill'+(ok?' ok':'')}
+async function loadModel(buf){
+  try{
+    ort.env.wasm.wasmPaths='https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.1/dist/';
+    session=await ort.InferenceSession.create(buf,{executionProviders:['webgpu','wasm'],graphOptimizationLevel:'all'});
+    pill('โมเดลพร้อมใช้งาน ✓',true);
+  }catch(e){session=null;pill('โหลดโมเดลไม่สำเร็จ: '+e.message,false)}
+  updBtns();
+}
+$('pickModel').onclick=()=>$('mf').click();
+$('mf').onchange=async e=>{const f=e.target.files[0];if(f)await loadModel(await f.arrayBuffer())};
+
+// ---------- วิดีโอ & เฟรม ----------
+function codecMsg(err){return err&&err.code===4?'Chrome เปิดไฟล์นี้ไม่ได้ (มักเป็น H.265/HEVC, MKV, AVI) — แปลงเป็น MP4 (H.264) ก่อน':'เปิดวิดีโอไม่ได้'}
+function ensureVid(it){
+  if(it.vid)return Promise.resolve(it.vid);
+  return new Promise((res,rej)=>{
+    const v=document.createElement('video');v.muted=true;v.preload='auto';v.playsInline=true;
+    v.onloadeddata=()=>{it.vid=v;it.dur=v.duration;res(v)};
+    v.onerror=()=>rej(new Error(codecMsg(v.error)));
+    v.src=URL.createObjectURL(it.file);
+  });
+}
+function seek(v,t){return new Promise(r=>{
+  const tt=Math.max(0,Math.min(t,v.duration-0.05));
+  if(!v.seeking&&Math.abs(v.currentTime-tt)<0.001&&v.readyState>=2)return r();
+  const done=()=>{clearTimeout(to);v.removeEventListener('seeked',done);r()};
+  const to=setTimeout(done,3000);
+  v.addEventListener('seeked',done);v.currentTime=tt;
+})}
+// เรียงคิวต่อวิดีโอ เพื่อไม่ให้ seek ซ้อนกัน
+function getFrame(v,t){
+  const p=(v._q||Promise.resolve()).then(async()=>{await seek(v,t);return createImageBitmap(v)});
+  v._q=p.catch(()=>{});return p;
+}
+
+// ---------- โซน ----------
+const zonesOf=c=>zonesAll[c]||{a:[],b:[]};
+function saveZones(){localStorage.uZones=JSON.stringify(zonesAll)}
+function inZ(q,z,W,H){
+  if(!z||z.length<3)return false;const x=q.cx/W,y=q.b.y2/H;let c=false;
+  for(let i=0,j=z.length-1;i<z.length;j=i++){const[xi,yi]=z[i],[xj,yj]=z[j];if((yi>y)!==(yj>y)&&x<(xj-xi)*(y-yi)/(yj-yi)+xi)c=!c}
+  return c;
+}
+function zoneSync(){
+  if(filterCat!=='all')$('zcat').value=filterCat;
+  const cat=$('zcat').value,list=items.filter(i=>i.cat===cat);
+  $('zsrc').innerHTML=list.map(i=>`<option value="${i.id}">${esc(i.name)}</option>`).join('')||'<option value="">— ยังไม่มีวิดีโอในหมวดนี้ —</option>';
+  zk=null;loadZonePreview();
+}
+async function loadZonePreview(){
+  const it=items.find(i=>i.id==$('zsrc').value);zSample=null;
+  if(it){try{const v=await ensureVid(it);zSample=await getFrame(v,v.duration*0.25)}catch(e){$('zmsg').textContent=e.message}}
+  if(zSample){zc.width=zSample.width;zc.height=zSample.height}
+  drawZone();
+}
+function drawZone(){
+  const cat=$('zcat').value,z=zonesOf(cat),c=zc.getContext('2d'),w=zc.width,h=zc.height;
+  if(zSample)c.drawImage(zSample,0,0,w,h);else{c.fillStyle='#000';c.fillRect(0,0,w,h)}
+  for(const k of['a','b']){const p=z[k];if(!p||!p.length)continue;
+    poly(c,p,w,h);c.fillStyle=`rgba(${ZC[k]},.25)`;c.strokeStyle=`rgb(${ZC[k]})`;c.lineWidth=Math.max(2,w/400);
+    if(p.length>2)c.fill();c.stroke();c.fillStyle=`rgb(${ZC[k]})`;
+    p.forEach(([x,y])=>{c.beginPath();c.arc(x*w,y*h,Math.max(4,w/200),0,7);c.fill()});
+    c.font=`bold ${Math.round(w/28)}px sans-serif`;c.fillText(k.toUpperCase(),p[0][0]*w+8,p[0][1]*h-8);
+  }
+  $('zmsg').textContent=zk?`กำลังวาดโซน ${zk.toUpperCase()} — คลิกวางจุด (อย่างน้อย 3 จุด)`
+    :(z.a.length>2&&z.b.length>2?'มีโซน A และ B — รถต้องผ่าน A แล้วไป B'
+    :z.a.length>2?'มีโซน A — ใช้ร่วมกับมุมกลับรถ':'ยังไม่มีโซน — ใช้มุมกลับรถอย่างเดียว');
+}
+zc.onclick=e=>{if(!zk)return;const r=zc.getBoundingClientRect(),cat=$('zcat').value,z=zonesOf(cat);
+  z[zk].push([(e.clientX-r.left)/r.width,(e.clientY-r.top)/r.height]);zonesAll[cat]=z;saveZones();drawZone()};
+zc.oncontextmenu=e=>{e.preventDefault();if(!zk)return;const cat=$('zcat').value,z=zonesOf(cat);z[zk].pop();zonesAll[cat]=z;saveZones();drawZone()};
+$('za').onclick=()=>{zk='a';const cat=$('zcat').value,z=zonesOf(cat);z.a=[];zonesAll[cat]=z;saveZones();drawZone()};
+$('zb').onclick=()=>{zk='b';const cat=$('zcat').value,z=zonesOf(cat);z.b=[];zonesAll[cat]=z;saveZones();drawZone()};
+$('zdone').onclick=()=>{zk=null;drawZone()};
+$('zr').onclick=()=>{zk=null;delete zonesAll[$('zcat').value];saveZones();drawZone()};
+$('zcat').onchange=zoneSync;
+$('zsrc').onchange=loadZonePreview;
+
+// ---------- ตรวจจับ YOLO ----------
 function iou(a,b){const w=Math.min(a.x2,b.x2)-Math.max(a.x1,b.x1),h=Math.min(a.y2,b.y2)-Math.max(a.y1,b.y1);
   if(w<=0||h<=0)return 0;const i=w*h;return i/((a.x2-a.x1)*(a.y2-a.y1)+(b.x2-b.x1)*(b.y2-b.y1)-i)}
 function nms(r){r.sort((a,b)=>b.sc-a.sc);const k=[];for(const d of r)if(k.every(o=>iou(o,d)<0.5))k.push(d);return k}
-async function detect(bmp){
+async function detect(bmp,conf){
   const s=Math.min(640/bmp.width,640/bmp.height),w=bmp.width*s,h=bmp.height*s,dx=(640-w)/2,dy=(640-h)/2;
-  cx.fillStyle='#727272';cx.fillRect(0,0,640,640);cx.drawImage(bmp,dx,dy,w,h);
-  const d=cx.getImageData(0,0,640,640).data,N=640*640,f=new Float32Array(3*N);
-  for(let i=0;i<N;i++){f[i]=d[i*4]/255;f[N+i]=d[i*4+1]/255;f[2*N+i]=d[i*4+2]/255}
+  dctx.fillStyle='#727272';dctx.fillRect(0,0,640,640);dctx.drawImage(bmp,dx,dy,w,h);
+  const d=dctx.getImageData(0,0,640,640).data,NN=640*640,f=new Float32Array(3*NN);
+  for(let i=0;i<NN;i++){f[i]=d[i*4]/255;f[NN+i]=d[i*4+1]/255;f[2*NN+i]=d[i*4+2]/255}
   const o=await session.run({[session.inputNames[0]]:new ort.Tensor('float32',f,[1,3,640,640])});
   const out=o[session.outputNames[0]].data,A=out.length/84,res=[];
-  for(let i=0;i<A;i++){let best=0,bc=-1;
+  for(let i=0;i<A;i++){
+    let best=0,bc=-1;
     for(const c of [2,3,5,7]){const v=out[(4+c)*A+i];if(v>best){best=v;bc=c}}
-    if(best<P.conf)continue;const x=out[i],y=out[A+i],ww=out[2*A+i],hh=out[3*A+i];
+    if(best<conf)continue;
+    const x=out[i],y=out[A+i],ww=out[2*A+i],hh=out[3*A+i];
     const b={x1:Math.max(0,(x-ww/2-dx)/s),y1:Math.max(0,(y-hh/2-dy)/s),x2:Math.min(bmp.width,(x+ww/2-dx)/s),y2:Math.min(bmp.height,(y+hh/2-dy)/s),sc:best,c:bc};
-    if(b.x2-b.x1>0.02*bmp.width)res.push(b)}
-  return nms(res)}
-function sharp(bmp,b){ // ความคม (Laplacian variance) ของกรอบรถ ใช้เลือกเฟรมที่เห็นทะเบียนชัดสุด
-  const w=Math.max(8,b.x2-b.x1),h=Math.max(8,b.y2-b.y1),k=Math.min(1,96/w),cw=Math.round(w*k),ch=Math.round(h*k);
-  sc2.width=cw;sc2.height=ch;sx.drawImage(bmp,b.x1,b.y1,w,h,0,0,cw,ch);
-  const d=sx.getImageData(0,0,cw,ch).data,g=new Float32Array(cw*ch);
+    if(b.x2-b.x1>0.02*bmp.width)res.push(b);
+  }
+  return nms(res);
+}
+function sharp(bmp,b){
+  const w=Math.max(8,b.x2-b.x1),h=Math.max(8,b.y2-b.y1),k=Math.min(1,96/w),cw=Math.max(3,Math.round(w*k)),ch=Math.max(3,Math.round(h*k));
+  sc2.width=cw;sc2.height=ch;shx.drawImage(bmp,b.x1,b.y1,w,h,0,0,cw,ch);
+  const d=shx.getImageData(0,0,cw,ch).data,g=new Float32Array(cw*ch);
   for(let i=0;i<g.length;i++)g[i]=.3*d[i*4]+.59*d[i*4+1]+.11*d[i*4+2];
-  let s=0,s2=0,n=0;for(let y=1;y<ch-1;y++)for(let x=1;x<cw-1;x++){const i=y*cw+x,l=4*g[i]-g[i-1]-g[i+1]-g[i-cw]-g[i+cw];s+=l;s2+=l*l;n++}
-  return n?s2/n-(s/n)**2:0}
+  let s=0,s2=0,n=0;
+  for(let y=1;y<ch-1;y++)for(let x=1;x<cw-1;x++){const i=y*cw+x,l=4*g[i]-g[i-1]-g[i+1]-g[i-cw]-g[i+cw];s+=l;s2+=l*l;n++}
+  return n?s2/n-(s/n)**2:0;
+}
 
-// ---------- ติดตามรถ + ตัดสินกลับรถ ----------
-const mk=(i,d)=>({i,b:d,cx:(d.x1+d.x2)/2,cy:(d.y1+d.y2)/2,s:sharp(curBmp,d)*(d.x2-d.x1)});
-function update(i,dets){const used=new Set();
-  for(const t of tracks){if(t.done)continue;const l=t.pts[t.pts.length-1];
+// ---------- ติดตาม & ตัดสินกลับรถ ----------
+const mk=(bmp,i,d)=>({i,b:d,cx:(d.x1+d.x2)/2,cy:(d.y1+d.y2)/2,s:sharp(bmp,d)*(d.x2-d.x1)});
+function update(C,i,dets,bmp){
+  const used=new Set();
+  for(const t of C.tracks){if(t.done)continue;const l=t.pts[t.pts.length-1];
     let bj=-1,bd=0.9*Math.max(l.b.x2-l.b.x1,l.b.y2-l.b.y1);
     dets.forEach((d,j)=>{if(used.has(j))return;const dd=Math.hypot((d.x1+d.x2-l.b.x1-l.b.x2)/2,(d.y1+d.y2-l.b.y1-l.b.y2)/2);if(dd<bd){bd=dd;bj=j}});
-    if(bj>=0){used.add(bj);t.pts.push(mk(i,dets[bj]))}}
-  dets.forEach((d,j)=>{if(!used.has(j))tracks.push({done:false,pts:[mk(i,d)]})});}
-function closeStale(i,force){for(const t of tracks)if(!t.done&&(force||i-t.pts[t.pts.length-1].i>P.lost)){t.done=true;evalTrack(t)}
-  tracks=tracks.filter(t=>!t.done)}
-function evalTrack(t){
-  const p=t.pts;if(p.length<P.minPts)return;
-  if(hasAB()){ // กฎลำดับโซน: ผ่านโซนเริ่ม (A) แล้วไปโซนจบ (B)
-    const ia=p.findIndex(q=>inZ(q,zones.a));if(ia<0)return;
-    let ib=-1;for(let j=ia+1;j<p.length;j++)if(inZ(p[j],zones.b)){ib=j;break}
-    if(ib<0)return;let bi=ib;for(let j=ib;j<p.length;j++)if(p[j].s>p[bi].s)bi=j;
-    events.push({s:p[ia].i,e:p[bi].i,t:p,ang:0,ok:null});renderList();return}
-  const k=Math.max(2,Math.floor(p.length/4)),v1=[p[k].cx-p[0].cx,p[k].cy-p[0].cy],n=p.length-1,v2=[p[n].cx-p[n-k].cx,p[n].cy-p[n-k].cy];
-  if(Math.hypot(...v1)<0.03*W||Math.hypot(...v2)<0.03*W)return;
-  const a=ang(v1,v2);if(a<P.ang||!p.some(inZone))return;
-  let s=0;for(let j=3;j<p.length;j++){const v=[p[j].cx-p[j-3].cx,p[j].cy-p[j-3].cy];
-    if(Math.hypot(...v)>=2&&ang(v,v1)>35){s=j-3;break}}
-  let bi=s;for(let j=s;j<p.length;j++)if(p[j].s>p[bi].s)bi=j;
-  events.push({s:p[s].i,e:Math.max(p[bi].i,p[s].i),t:p,ang:a,ok:null});renderList()}
-
-// ---------- แสดงภาพสดขณะวิ่ง ----------
-const lv=$('lv'),lx=lv.getContext('2d');
-function live(bmp,i,dets,st){
-  if(lv.width!==bmp.width||lv.height!==bmp.height){lv.width=bmp.width;lv.height=bmp.height}
-  lx.drawImage(bmp,0,0);lx.lineWidth=Math.max(2,bmp.width/400);
-  for(const k of['a','b']){const z=zones[k];if(z&&z.length>2){poly(lx,z,W,H);lx.strokeStyle=`rgba(${ZC[k]},.8)`;lx.setLineDash([8,6]);lx.stroke();lx.setLineDash([])}}
-  lx.strokeStyle='#3fb950';for(const t of tracks){lx.beginPath();t.pts.forEach((p,k)=>k?lx.lineTo(p.cx,p.cy):lx.moveTo(p.cx,p.cy));lx.stroke()}
-  lx.strokeStyle='#f5a524';for(const d of dets)lx.strokeRect(d.x1,d.y1,d.x2-d.x1,d.y2-d.y1);
-  $('lt').textContent=`ภาพ ${i+1}/${N()} · ${nm(i)} · ${st}`}
-
-// ---------- วนประมวลผลทุกภาพ ----------
-function readP(){if(vid){VS=1/+$('vfps').value;vN=Math.floor(vid.duration/VS)}
-  P={conf:+$('conf').value,mot:+$('mot').value/1000,ang:+$('ang').value,pre:+$('pre').value,post:+$('post').value,all:$('all').checked,hang:3,lost:8,minPts:3}
-}
-$('stop').onclick=()=>stopF=true;
-$('run').onclick=async()=>{
-  readP();stopF=false;events=[];tracks=[];cur=-1;renderList();
-  $('run').disabled=true;$('stop').disabled=false;let prev=null,hang=0,det=0;const t0=performance.now();
-  for(let i=0;i<N()&&!stopF;i++){
-    const bmp=await getBmp(i);curBmp=bmp;
-    smx.drawImage(bmp,0,0,80,45);const d=smx.getImageData(0,0,80,45).data,g=new Uint8Array(3600);
-    for(let k=0;k<3600;k++)g[k]=(d[k*4]+d[k*4+1]+d[k*4+2])/3;
-    let mv=0;if(prev){let c=0;for(let k=0;k<3600;k++)if(Math.abs(g[k]-prev[k])>20)c++;mv=c/3600}prev=g;
-    if(P.all||mv>P.mot)hang=P.hang;
-    let dets=[],st='ข้าม (ไม่มีความเคลื่อนไหว)';
-    if(hang>0){hang--;det++;dets=await detect(bmp);update(i,dets);st='ตรวจพบรถ '+dets.length+' คัน'}
-    if($('lvon').checked&&(dets.length||i%4==0)){live(bmp,i,dets,st);await new Promise(r=>setTimeout(r))}
-    closeStale(i);bmp.close();
-    if(i%5==0||i===N()-1){const pct=(i+1)/N()*100,sec=(performance.now()-t0)/1000,
-      eta=sec/(i+1)*(N()-i-1),tpos=vid?` · ตำแหน่งวิดีโอ ${fmtT(i*VS)}`:'';
-      $('pt').textContent=`${pct.toFixed(1)}% (${(i+1).toLocaleString()}/${N().toLocaleString()}) · ตรวจรถ ${det} เฟรม · พบ ${events.length} เหตุการณ์ · ผ่านไป ${sec.toFixed(0)} วิ · เหลืออีก ~${eta.toFixed(0)} วิ${tpos}`;
-      $('bar').firstChild.style.width=pct+'%';await new Promise(r=>setTimeout(r))}
+    if(bj>=0){used.add(bj);t.pts.push(mk(bmp,i,dets[bj]))}
   }
-  closeStale(0,true);events.sort((a,b)=>a.s-b.s);renderList();
-  $('pt').textContent=(stopF?'หยุดแล้ว · ':'เสร็จแล้ว · ')+`พบ ${events.length} เหตุการณ์ที่น่าสงสัย`;
-  $('bar').firstChild.style.width='100%';$('run').disabled=false;$('stop').disabled=true;if(events.length)sel(0)};
+  dets.forEach((d,j)=>{if(!used.has(j))C.tracks.push({done:false,pts:[mk(bmp,i,d)]})});
+}
+function closeStale(C,i,force){
+  for(const t of C.tracks)if(!t.done&&(force||i-t.pts[t.pts.length-1].i>C.o.lost)){t.done=true;evalTrack(C,t)}
+  C.tracks=C.tracks.filter(t=>!t.done);
+}
+function evalTrack(C,t){
+  const p=t.pts,{Z,W,H}=C;if(p.length<C.o.minPts)return;
+  const AB=Z.a&&Z.a.length>2&&Z.b&&Z.b.length>2;
+  if(AB){
+    const ia=p.findIndex(q=>inZ(q,Z.a,W,H));if(ia<0)return;
+    let ib=-1;for(let j=ia+1;j<p.length;j++)if(inZ(p[j],Z.b,W,H)){ib=j;break}
+    if(ib<0)return;
+    let bi=ib;for(let j=ib;j<p.length;j++)if(p[j].s>p[bi].s)bi=j;
+    C.evs.push({s:p[ia].i,e:p[bi].i,t:p,ang:0});return;
+  }
+  const k=Math.max(2,Math.floor(p.length/4)),n=p.length-1;
+  const v1=[p[k].cx-p[0].cx,p[k].cy-p[0].cy],v2=[p[n].cx-p[n-k].cx,p[n].cy-p[n-k].cy];
+  if(Math.hypot(...v1)<0.03*W||Math.hypot(...v2)<0.03*W)return;
+  const a=ang(v1,v2);
+  if(a<C.o.ang)return;
+  if(Z.a&&Z.a.length>2&&!p.some(q=>inZ(q,Z.a,W,H)))return;
+  let s=0;
+  for(let j=3;j<p.length;j++){const v=[p[j].cx-p[j-3].cx,p[j].cy-p[j-3].cy];if(Math.hypot(...v)>=2&&ang(v,v1)>35){s=j-3;break}}
+  let bi=s;for(let j=s;j<p.length;j++)if(p[j].s>p[bi].s)bi=j;
+  C.evs.push({s:p[s].i,e:Math.max(p[bi].i,p[s].i),t:p,ang:a});
+}
+
+// ---------- แสดงภาพสด & ความคืบหน้า ----------
+function live(bmp,i,dets,C,it){
+  if(lv.width!==bmp.width||lv.height!==bmp.height){lv.width=bmp.width;lv.height=bmp.height}
+  $('livebox').hidden=false;
+  const w=bmp.width,h=bmp.height;
+  lctx.drawImage(bmp,0,0);lctx.lineWidth=Math.max(2,w/400);
+  for(const k of['a','b']){const z=C.Z[k];if(z&&z.length>2){poly(lctx,z,w,h);lctx.strokeStyle=`rgba(${ZC[k]},.8)`;lctx.setLineDash([8,6]);lctx.stroke();lctx.setLineDash([])}}
+  lctx.strokeStyle='#3fb950';
+  for(const t of C.tracks){lctx.beginPath();t.pts.forEach((p,k)=>k?lctx.lineTo(p.cx,p.cy):lctx.moveTo(p.cx,p.cy));lctx.stroke()}
+  lctx.strokeStyle='#f5a524';for(const d of dets)lctx.strokeRect(d.x1,d.y1,d.x2-d.x1,d.y2-d.y1);
+  $('lvt').textContent=`${it.name} · ${fmtT(i*C.o.step)} · พบ ${C.evs.length} เหตุการณ์`;
+}
+function updRow(it,txt){
+  const el=$('r'+it.id);if(!el)return;
+  const bi=el.querySelector('.bar i');if(bi)bi.style.width=it.pct+'%';
+  if(txt)el.querySelector('[data-info]').textContent=txt;
+}
+function prog(it,i,n,t0,det,evn){
+  const pct=(i+1)/n*100;it.pct=pct;
+  const sec=(performance.now()-t0)/1000,eta=sec/(i+1)*(n-i-1);
+  updRow(it,`${pct.toFixed(1)}% · ตรวจรถ ${det} เฟรม · พบ ${evn} เหตุการณ์ · เหลือ ~${fmtSec(eta)}`);
+  $('ovBar').style.width=((RUN.doneN+pct/100)/Math.max(1,RUN.total)*100)+'%';
+  $('ovT').textContent=`ไฟล์ ${RUN.doneN+1}/${RUN.total} · ${it.name} · ผ่านไป ${fmtSec(sec)}`;
+}
+
+// ---------- ประมวลผลวิดีโอหนึ่งไฟล์ ----------
+async function processItem(it){
+  const v=await ensureVid(it),o=S(),n=Math.max(1,Math.floor(v.duration/o.step));
+  it.step=o.step;it.dur=v.duration;
+  const C={tracks:[],evs:[],Z:zonesOf(it.cat),o,W:v.videoWidth,H:v.videoHeight};
+  let prev=null,hang=0,det=0;const t0=performance.now();
+  for(let i=0;i<n&&!stopF;i++){
+    const bmp=await getFrame(v,i*o.step);
+    smx.drawImage(bmp,0,0,80,45);
+    const d=smx.getImageData(0,0,80,45).data,g=new Uint8Array(3600);
+    for(let k=0;k<3600;k++)g[k]=(d[k*4]+d[k*4+1]+d[k*4+2])/3;
+    let mv=0;
+    if(prev){let c=0;for(let k=0;k<3600;k++)if(Math.abs(g[k]-prev[k])>20)c++;mv=c/3600}
+    prev=g;
+    if(mv>o.mot)hang=o.hang;
+    let dets=[];
+    if(hang>0){hang--;det++;dets=await detect(bmp,o.conf);update(C,i,dets,bmp)}
+    if(o.live&&(dets.length||i%4===0))live(bmp,i,dets,C,it);
+    closeStale(C,i,false);
+    bmp.close();
+    if(i%4===0||i===n-1){prog(it,i,n,t0,det,C.evs.length);await new Promise(r=>setTimeout(r,0))}
+  }
+  closeStale(C,0,true);
+  it.events=C.evs.sort((a,b)=>a.s-b.s).map(e=>({...e,ok:null,plate:{t:'',f:'',n:'',v:''}}));
+}
+
+// ---------- คิว ----------
+function runnable(i,cat){return i.status==='wait'&&(!cat||cat==='all'||i.cat===cat)}
+async function runQueue(cat){
+  if(running)return;
+  if(!session)return alert('โมเดลยังไม่พร้อม — เลือกไฟล์ yolov8n.onnx ก่อน');
+  RUN={total:items.filter(i=>runnable(i,cat)).length,doneN:0};
+  if(!RUN.total)return;
+  running=true;stopF=false;updBtns();
+  while(!stopF){const it=items.find(i=>runnable(i,cat));if(!it)break;await runOne(it)}
+  running=false;
+  $('ovT').textContent=stopF?'หยุดแล้ว — ไฟล์ที่ยังไม่เสร็จจะกลับเข้าคิว':`เสร็จทั้งหมด ${RUN.doneN} ไฟล์`;
+  if(!stopF)$('ovBar').style.width='100%';
+  $('stop').textContent='หยุด';
+  renderAll();
+}
+async function runOne(it){
+  it.status='run';it.pct=0;it.events=[];renderQueue();updBtns();
+  try{
+    await processItem(it);
+    if(stopF){it.status='wait';it.pct=0;it.events=[]}
+    else{it.status='done';it.pct=100;RUN.doneN++}
+  }catch(e){console.error(e);it.status='err';it.err=e.message||String(e);RUN.doneN++}
+  renderQueue();renderStats();renderCats();updBtns();
+}
+$('runAll').onclick=()=>runQueue(null);
+$('runCat').onclick=()=>runQueue(filterCat);
+$('stop').onclick=()=>{stopF=true;$('stop').textContent='กำลังหยุด…'};
+
+function addFiles(list){
+  const fs=[...list].filter(f=>/^video\//.test(f.type)||/\.(mp4|mov|mkv|webm|m4v|avi)$/i.test(f.name));
+  if(!fs.length)return alert('ไม่พบไฟล์วิดีโอ');
+  const cat=filterCat==='all'?($('catSel').value||cats[0]):filterCat;
+  fs.sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true}));
+  for(const f of fs)items.push({id:++uid,file:f,name:f.name,cat,status:'wait',pct:0,events:[],vid:null,dur:0,step:0,err:''});
+  renderAll();
+}
+$('pickFiles').onclick=()=>$('vfile').click();
+$('vfile').onchange=e=>{addFiles(e.target.files);e.target.value=''};
+$('pickDir').onclick=async()=>{
+  if(!window.showDirectoryPicker)return alert('ต้องใช้ Chrome หรือ Edge');
+  const d=await showDirectoryPicker(),fl=[];
+  for await(const [n,h] of d.entries())if(h.kind==='file'&&/\.(mp4|mov|mkv|webm|m4v|avi)$/i.test(n))fl.push(await h.getFile());
+  addFiles(fl);
+};
+const dz=$('drop');
+['dragenter','dragover'].forEach(t=>dz.addEventListener(t,e=>{e.preventDefault();dz.classList.add('on')}));
+['dragleave','drop'].forEach(t=>dz.addEventListener(t,e=>{e.preventDefault();dz.classList.remove('on')}));
+dz.addEventListener('drop',e=>addFiles(e.dataTransfer.files));
+
+function infoOf(it){
+  if(it.status==='done')return `${it.events.length} เหตุการณ์${it.dur?' · ยาว '+fmtT(it.dur):''}`;
+  if(it.status==='err')return it.err;
+  return `${(it.file.size/1048576).toFixed(0)} MB`;
+}
+function rowHTML(it){
+  const lock=it.status==='run';
+  return `<div class="qi" id="r${it.id}">
+    <div style="min-width:0"><div class="fn" title="${esc(it.name)}">${esc(it.name)}</div><div class="mu" data-info>${esc(infoOf(it))}</div></div>
+    <select data-cat-id="${it.id}" ${lock?'disabled':''}>${cats.map(c=>`<option value="${esc(c)}" ${c===it.cat?'selected':''}>${esc(c)}</option>`).join('')}</select>
+    <div class="bar"><i style="width:${it.pct}%"></i></div>
+    <span class="st ${it.status}">${BADGE[it.status]}</span>
+    <button class="icon dng" data-del="${it.id}" ${lock?'disabled':''} title="ลบออกจากคิว">✕</button>
+  </div>`;
+}
+function renderQueue(){
+  const list=items.filter(i=>filterCat==='all'||i.cat===filterCat);
+  $('qcount').textContent=list.length?`(${list.length} ไฟล์)`:'';
+  $('qlist').innerHTML=list.map(rowHTML).join('')||`<div class="empty">ยังไม่มีวิดีโอ${filterCat==='all'?'':' ในหมวดนี้'} — ลากไฟล์มาวางด้านบน</div>`;
+}
+$('qlist').addEventListener('change',e=>{
+  const s=e.target.closest('[data-cat-id]');if(!s)return;
+  const it=items.find(i=>i.id==s.dataset.catId);if(it){it.cat=s.value;renderAll()}
+});
+$('qlist').addEventListener('click',e=>{
+  const b=e.target.closest('[data-del]');if(!b)return;
+  const it=items.find(i=>i.id==b.dataset.del);if(!it||it.status==='run')return;
+  if(it.vid)URL.revokeObjectURL(it.vid.src);
+  items=items.filter(x=>x!==it);
+  if(REV.id===it.id)REV={id:null,k:-1};
+  renderAll();
+});
+
+// ---------- หมวดหมู่ ----------
+function keepSel(sel,html){const v=sel.value;sel.innerHTML=html;if([...sel.options].some(o=>o.value===v))sel.value=v}
+function renderCats(){
+  const n=c=>items.filter(i=>i.cat===c).length,d=c=>items.filter(i=>i.cat===c&&i.status==='done').length;
+  $('cats').innerHTML=`<div class="cat ${filterCat==='all'?'on':''}" data-cat="all"><span>ทั้งหมด</span><small>${items.filter(i=>i.status==='done').length}/${items.length}</small></div>`+
+    cats.map(c=>`<div class="cat ${filterCat===c?'on':''}" data-cat="${esc(c)}"><span>${esc(c)}</span><small>${d(c)}/${n(c)}</small></div>`).join('');
+  const opts=cats.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');
+  keepSel($('catSel'),opts);keepSel($('zcat'),opts);
+  keepSel($('rvCat'),`<option value="all">ทุกหมวด</option>`+opts);
+}
+$('cats').onclick=e=>{
+  const d=e.target.closest('[data-cat]');if(!d)return;
+  filterCat=d.dataset.cat;
+  if(filterCat!=='all'){$('catSel').value=filterCat;$('rvCat').value=filterCat}
+  renderAll();
+};
+$('addCat').onclick=()=>{
+  const n=$('newCat').value.trim();if(!n)return;
+  if(!cats.includes(n)){cats.push(n);localStorage.uCats=JSON.stringify(cats)}
+  $('newCat').value='';filterCat=n;renderAll();
+};
+$('newCat').onkeydown=e=>{if(e.key==='Enter')$('addCat').click()};
+
+// ---------- สถานะ & ปุ่ม ----------
+function renderStats(){
+  $('sV').textContent=items.length;
+  $('sD').textContent=items.filter(i=>i.status==='done').length;
+  $('sE').textContent=items.reduce((a,i)=>a+i.events.length,0);
+  $('sY').textContent=items.reduce((a,i)=>a+i.events.filter(e=>e.ok===true).length,0);
+}
+function updBtns(){
+  const waiting=items.filter(i=>i.status==='wait');
+  $('runAll').disabled=running||!session||!waiting.length;
+  const hasCat=waiting.some(i=>filterCat==='all'||i.cat===filterCat);
+  $('runCat').disabled=running||!session||!hasCat||filterCat==='all';
+  $('runCat').textContent=filterCat==='all'?'เริ่มเฉพาะหมวด (เลือกหมวดก่อน)':`เริ่มหมวด "${filterCat}"`;
+  $('stop').disabled=!running;
+  $('exp').disabled=!items.some(i=>i.events.some(e=>e.ok===true));
+}
+function renderAll(){
+  renderCats();renderQueue();renderStats();updBtns();
+  if(!$('v-review').hidden)renderReview();
+}
+
+// ---------- แท็บ ----------
+document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x===b));
+  document.querySelectorAll('.view').forEach(v=>v.hidden=v.id!=='v-'+b.dataset.v);
+  if(b.dataset.v==='zones')zoneSync();
+  if(b.dataset.v==='review'){renderReview();showRV()}
+});
+$('lvon').onchange=()=>{$('livebox').hidden=!$('lvon').checked};
 
 // ---------- ตรวจทาน ----------
-function renderList(){
-  $('list').innerHTML=events.map((e,k)=>`<div class="ev ${k==cur?'sel ':''}${e.ok===true?'y':e.ok===false?'n':''}" onclick="sel(${k})">#${k+1} · ภาพ ${e.s+1}–${e.e+1} · ${e.ang?Math.round(e.ang)+'°':'A→B'}</div>`).join('')||'<div class="m">ยังไม่มีเหตุการณ์</div>';
-  const y=events.filter(e=>e.ok).length;$('cnt').textContent=events.length?`(ยืนยัน ${y} / ${events.length})`:'';$('ex').disabled=!y}
-async function sel(k){cur=k;const e=events[k],sl=$('sl');
-  sl.min=Math.max(0,e.t[0].i-5);sl.max=Math.min(N()-1,e.t[e.t.length-1].i+5);renderList();loadPlate();await show(e.s);drawPlate()}
-async function show(i){
-  if(cur<0)return;fi=i;$('sl').value=i;const bmp=await getBmp(i),e=events[cur];
-  vc.width=bmp.width;vc.height=bmp.height;vx.drawImage(bmp,0,0);bmp.close();
-  vx.fillStyle='#3fb950';e.t.forEach(p=>{vx.beginPath();vx.arc(p.cx,p.cy,4,0,7);vx.fill()});
-  const q=e.t.find(p=>p.i==i);if(q){vx.strokeStyle='#f5a524';vx.lineWidth=4;vx.strokeRect(q.b.x1,q.b.y1,q.b.x2-q.b.x1,q.b.y2-q.b.y1)}
-  $('info').textContent=`${nm(i)}${i==e.s?' · จุดเริ่ม':''}${i==e.e?' · จุดจบ (เห็นทะเบียน)':''} — ช่วง ${nm(e.s)} → ${nm(e.e)}`}
-$('sl').oninput=e=>show(+e.target.value);
-function mark(v){if(cur<0)return;events[cur].ok=v;renderList();if(cur<events.length-1)sel(cur+1).then(()=>$('pf').focus())}
-$('by').onclick=()=>mark(true);$('bn').onclick=()=>mark(false);
-$('bs').onclick=()=>{if(cur>=0){events[cur].s=Math.min(fi,events[cur].e);show(fi);renderList()}};
-$('be').onclick=()=>{if(cur>=0){events[cur].e=Math.max(fi,events[cur].s);show(fi);renderList();drawPlate()}};
-document.addEventListener('keydown',e=>{if($('t1').hidden)return;if(/INPUT|SELECT/.test(e.target.tagName)&&e.target.type!=='range')return;const k=e.key;
-  if(k==='y'||k==='Y')mark(true);else if(k==='n'||k==='N')mark(false);
-  else if(k==='ArrowRight'){e.preventDefault();show(Math.min(+$('sl').max,fi+1))}
-  else if(k==='ArrowLeft'){e.preventDefault();show(Math.max(+$('sl').min,fi-1))}
-  else if(k==='ArrowDown'&&cur<events.length-1){e.preventDefault();sel(cur+1)}
-  else if(k==='ArrowUp'&&cur>0){e.preventDefault();sel(cur-1)}
-  else if(k==='[')$('bs').click();else if(k===']')$('be').click()});
+const curIt=()=>items.find(i=>i.id===REV.id);
+const curEv=()=>{const it=curIt();return it?it.events[REV.k]:undefined};
 
-// ---------- ข้อมูลทะเบียนสำหรับ PTM ----------
-const PROV='กรุงเทพมหานคร กระบี่ กาญจนบุรี กาฬสินธุ์ กำแพงเพชร ขอนแก่น จันทบุรี ฉะเชิงเทรา ชลบุรี ชัยนาท ชัยภูมิ ชุมพร เชียงราย เชียงใหม่ ตรัง ตราด ตาก นครนายก นครปฐม นครพนม นครราชสีมา นครศรีธรรมราช นครสวรรค์ นนทบุรี นราธิวาส น่าน บึงกาฬ บุรีรัมย์ ปทุมธานี ประจวบคีรีขันธ์ ปราจีนบุรี ปัตตานี พระนครศรีอยุธยา พะเยา พังงา พัทลุง พิจิตร พิษณุโลก เพชรบุรี เพชรบูรณ์ แพร่ ภูเก็ต มหาสารคาม มุกดาหาร แม่ฮ่องสอน ยโสธร ยะลา ร้อยเอ็ด ระนอง ระยอง ราชบุรี ลพบุรี ลำปาง ลำพูน เลย ศรีสะเกษ สกลนคร สงขลา สตูล สมุทรปราการ สมุทรสงคราม สมุทรสาคร สระแก้ว สระบุรี สิงห์บุรี สุโขทัย สุพรรณบุรี สุราษฎร์ธานี สุรินทร์ หนองคาย หนองบัวลำภู อ่างทอง อำนาจเจริญ อุดรธานี อุตรดิตถ์ อุทัยธานี อุบลราชธานี'.split(' ');
-$('provs').innerHTML=PROV.map(p=>`<option value="${p}">`).join('');
-let lastType='';
-function loadPlate(){const p=(events[cur]&&events[cur].plate)||{};$('pty').value=p.t!==undefined?p.t:lastType;$('pf').value=p.f||'';$('pn').value=p.n||'';$('pv').value=p.v||''}
-function savePlate(){const e=events[cur];if(!e)return;lastType=$('pty').value;e.plate={t:lastType,f:$('pf').value.trim(),n:$('pn').value.trim(),v:$('pv').value.trim()}}
-['pty','pf','pn','pv'].forEach(id=>$(id).addEventListener('input',savePlate));
-$('pf').onkeydown=e=>{if(e.key==='Enter')$('pn').focus()};
-$('pn').onkeydown=e=>{if(e.key==='Enter')$('pv').focus()};
-$('pv').onkeydown=e=>{if(e.key==='Enter'){savePlate();mark(true)}};
-[['c1','pf'],['c2','pn'],['c3','pv']].forEach(([b,f])=>$(b).onclick=()=>navigator.clipboard.writeText($(f).value));
-async function drawPlate(){const e=events[cur];if(!e)return;
+function renderReview(){
+  const only=$('rvOnly').checked,cf=$('rvCat').value;flat=[];let h='';
+  for(const it of items){
+    if(it.status!=='done'||!it.events.length)continue;
+    if(cf!=='all'&&it.cat!==cf)continue;
+    const rows=it.events.map((e,k)=>[e,k]).filter(([e])=>!only||e.ok===null);
+    if(!rows.length)continue;
+    h+=`<div class="gh">${esc(it.cat)} · ${esc(it.name)}</div>`;
+    for(const [e,k] of rows){
+      const idx=flat.length;flat.push([it.id,k]);
+      const sel=REV.id===it.id&&REV.k===k?' sel':'',st=e.ok===true?' y':e.ok===false?' n':'';
+      h+=`<div class="ev${sel}${st}" data-rv="${idx}">#${idx+1} · ${fmtT(e.s*it.step)} → ${fmtT(e.e*it.step)}<br><span class="mu">${e.ang?Math.round(e.ang)+'° กลับรถ':'ผ่านโซน A→B'}</span></div>`;
+    }
+  }
+  $('evl').innerHTML=h||'<div class="empty">ยังไม่มีเหตุการณ์ให้ตรวจ — ประมวลผลวิดีโอก่อน</div>';
+  const cnt=items.reduce((a,i)=>a+i.events.length,0),ok=items.reduce((a,i)=>a+i.events.filter(e=>e.ok===true).length,0);
+  $('rvcnt').textContent=`ยืนยันแล้ว ${ok}/${cnt}`;
+  renderStats();updBtns();
+}
+$('rvCat').onchange=renderReview;
+$('rvOnly').onchange=renderReview;
+$('evl').onclick=e=>{const d=e.target.closest('[data-rv]');if(!d)return;const [id,k]=flat[+d.dataset.rv];selectRV(id,k)};
+function selectRV(id,k){REV={id,k};renderReview();showRV()}
+
+async function showRV(){
+  const it=curIt(),e=curEv();
+  if(!it||!e){vx.clearRect(0,0,vc.width,vc.height);$('info').textContent='';return}
+  const v=await ensureVid(it);
+  const total=Math.max(0,Math.floor(v.duration/it.step)-1);
+  $('sl').min=Math.max(0,e.s-10);$('sl').max=Math.min(total,e.e+10);
+  fillPlate(e);
+  await showFrame(e.s);
+  drawPlate();
+}
+async function showFrame(i){
+  const tok=++showTok,it=curIt(),e=curEv();if(!it||!e)return;
+  fi=i;$('sl').value=i;
+  const v=await ensureVid(it),bmp=await getFrame(v,i*it.step);
+  if(tok!==showTok){bmp.close();return}
+  vc.width=bmp.width;vc.height=bmp.height;vx.drawImage(bmp,0,0);
+  vx.fillStyle='#3fb950';
+  e.t.forEach(p=>{vx.beginPath();vx.arc(p.cx,p.cy,Math.max(4,bmp.width/200),0,7);vx.fill()});
+  const q=e.t.find(p=>p.i===i);
+  if(q){vx.strokeStyle='#f5a524';vx.lineWidth=Math.max(3,bmp.width/250);vx.strokeRect(q.b.x1,q.b.y1,q.b.x2-q.b.x1,q.b.y2-q.b.y1)}
+  bmp.close();
+  $('info').textContent=`${fmtT(i*it.step)}${i===e.s?' · จุดเริ่ม':''}${i===e.e?' · จุดจบ (เห็นทะเบียน)':''} — ${it.name}`;
+}
+async function drawPlate(){
+  const it=curIt(),e=curEv();if(!it||!e)return;
+  const my=++plTok;
   let q=e.t[0];for(const p of e.t)if(Math.abs(p.i-e.e)<Math.abs(q.i-e.e))q=p;
-  const bmp=await getBmp(e.e),b=q.b,m=0.08,w=b.x2-b.x1,h=b.y2-b.y1,
-  sx=Math.max(0,b.x1-w*m),sy=Math.max(0,b.y1-h*m),sw=Math.min(bmp.width-sx,w*(1+2*m)),sh=Math.min(bmp.height-sy,h*(1+2*m)),pc=$('pc');
+  const v=await ensureVid(it),bmp=await getFrame(v,e.e*it.step);
+  if(my!==plTok){bmp.close();return}
+  const b=q.b,m=0.08,w=b.x2-b.x1,h=b.y2-b.y1;
+  const sx=Math.max(0,b.x1-w*m),sy=Math.max(0,b.y1-h*m);
+  const sw=Math.max(1,Math.min(bmp.width-sx,w*(1+2*m))),sh=Math.max(1,Math.min(bmp.height-sy,h*(1+2*m)));
+  const pc=$('pc');
   pc.width=Math.min(640,Math.max(320,Math.round(sw*2)));pc.height=Math.round(pc.width*sh/sw);
-  pc.getContext('2d').drawImage(bmp,sx,sy,sw,sh,0,0,pc.width,pc.height);bmp.close()}
-onbeforeunload=e=>{if(events.length||Q.length)e.preventDefault()};
-const plSuffix=e=>{const p=e.plate||{};const x=[p.f&&p.n?p.f+p.n:p.f||p.n,p.v].filter(Boolean).join('-').replace(/[\\/:*?"<>|\s]/g,'');return x?'_'+x:''};
+  pc.getContext('2d').drawImage(bmp,sx,sy,sw,sh,0,0,pc.width,pc.height);
+  bmp.close();
+}
+function fillPlate(e){const p=e.plate;$('pty').value=p.t||lastType;$('pf').value=p.f;$('pn').value=p.n;$('pv').value=p.v}
+function savePlate(){
+  const e=curEv();if(!e)return;
+  lastType=$('pty').value;
+  e.plate={t:lastType,f:$('pf').value.trim(),n:$('pn').value.trim(),v:$('pv').value.trim()};
+}
+['pty','pf','pn','pv'].forEach(id=>$(id).addEventListener('input',savePlate));
+async function sendPTM(){
+  const e=curEv();if(!e||!e.plate.n)return;
+  try{await navigator.clipboard.writeText(JSON.stringify({_uturn:1,id:Date.now(),type:e.plate.t,f:e.plate.f,n:e.plate.n,prov:e.plate.v}))}
+  catch(err){alert('คัดลอกไม่สำเร็จ: '+err.message)}
+}
+$('cptm').onclick=sendPTM;
+[['c1','pf'],['c2','pn'],['c3','pv']].forEach(([b,f])=>$(b).onclick=()=>navigator.clipboard.writeText($(f).value));
+$('pf').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();$('pn').focus()}};
+$('pn').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();$('pv').focus()}};
+$('pv').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();savePlate();sendPTM();mark(true);$('pf').focus()}};
+
+function mark(v){
+  const it=curIt(),e=curEv();if(!it||!e)return;
+  savePlate();e.ok=v;
+  const idx=flat.findIndex(([id,k])=>id===REV.id&&k===REV.k);
+  const only=$('rvOnly').checked;
+  renderReview();
+  const next=only?Math.min(idx,flat.length-1):Math.min(idx+1,flat.length-1);
+  if(flat.length&&next>=0){const [id,k]=flat[next];REV={id,k};renderReview();showRV()}
+  else{REV={id:null,k:-1};renderReview();showRV()}
+}
+function setStart(){const e=curEv();if(!e)return;e.s=Math.min(fi,e.e);renderReview();showRV()}
+function setEnd(){const e=curEv();if(!e)return;e.e=Math.max(fi,e.s);renderReview();showRV()}
+$('by').onclick=()=>mark(true);
+$('bn').onclick=()=>mark(false);
+$('bs').onclick=setStart;
+$('be').onclick=setEnd;
+$('sl').oninput=e=>showFrame(+e.target.value);
+
+document.addEventListener('keydown',e=>{
+  if($('v-review').hidden)return;
+  if(/INPUT|SELECT|TEXTAREA/.test(e.target.tagName)&&e.target.type!=='range')return;
+  const k=e.key;
+  if(k==='y'||k==='Y')mark(true);
+  else if(k==='n'||k==='N')mark(false);
+  else if(k==='ArrowRight'){e.preventDefault();showFrame(Math.min(+$('sl').max,fi+1))}
+  else if(k==='ArrowLeft'){e.preventDefault();showFrame(Math.max(+$('sl').min,fi-1))}
+  else if(k==='ArrowDown'||k==='ArrowUp'){
+    e.preventDefault();
+    const idx=flat.findIndex(([id,kk])=>id===REV.id&&kk===REV.k);
+    const nx=idx+(k==='ArrowDown'?1:-1);
+    if(flat[nx])selectRV(flat[nx][0],flat[nx][1]);
+  }
+  else if(k==='[')setStart();
+  else if(k===']')setEnd();
+});
 
 // ---------- ส่งออก ----------
-const jpg=async i=>{const b=await getBmp(i),c=document.createElement('canvas');c.width=b.width;c.height=b.height;c.getContext('2d').drawImage(b,0,0);b.close();return new Promise(r=>c.toBlob(r,'image/jpeg',.95))}; // ภาพดิบ ไม่มีกรอบ
-const three=e=>{const pre=(typeof P.pre==='number'?P.pre:3),pl=e.e,bf=Math.max(0,e.s-Math.max(1,pre));let du=Math.round((e.s+e.e)/2);if(du<=bf)du=Math.min(pl,bf+1);return{bf,du,pl}};
-$('ex').onclick=async()=>{
-  const out=await showDirectoryPicker({mode:'readwrite'}),ok=events.filter(e=>e.ok),all=$('exall').checked;
-  let csv='\ufeffเหตุการณ์,จุดเริ่ม,จุดเห็นทะเบียน,จำนวนภาพ,ไฟล์ภาพเห็นทะเบียน,ประเภทรถ,หมวด,เลข,จังหวัด\n';
-  for(let n=0;n<ok.length;n++){const e=ok[n],name='เหตุการณ์_'+pad(n+1).padStart(3,'0')+plSuffix(e),dir=await out.getDirectoryHandle(name,{create:true});
-    let idx=[];
-    if(all){for(let i=Math.max(0,e.s-P.pre);i<=Math.min(N()-1,e.e+P.post);i++)idx.push(i)}
-    else{const t=three(e);idx=[t.bf,t.du,t.pl]}
-    let plate='';
-    for(const i of idx){let fn,data;
-      if(vid){const b=await getBmp(i),c=document.createElement('canvas');c.width=b.width;c.height=b.height;c.getContext('2d').drawImage(b,0,0);b.close();
-        data=await new Promise(r=>c.toBlob(r,'image/jpeg',.95));fn=(all?'':({[three(e).bf]:'1_ก่อนกระทำผิด_',[three(e).du]:'2_ระหว่างกระทำผิด_',[three(e).pl]:'3_ทะเบียน_'}[i]||''))+vfn.replace(/\.[^.]+$/,'')+'_'+fmtT(i*VS,'-')+'.jpg'}
-      else{data=await files[i].getFile();const t3=three(e);fn=(all?(i==e.e?'3_ทะเบียน_':''):(i==t3.bf?'1_ก่อนกระทำผิด_':i==t3.pl?'3_ทะเบียน_':i==t3.du?'2_ระหว่างกระทำผิด_':''))+data.name}
-      const w=await(await dir.getFileHandle(fn,{create:true})).createWritable();await w.write(data);await w.close();if(i==e.e)plate=fn}
-    csv+=`${name},${nm(e.s)},${nm(e.e)},${idx.length},${plate},${(e.plate||{}).t||''},${(e.plate||{}).f||''},${(e.plate||{}).n||''},${(e.plate||{}).v||''}\n`;$('exs').textContent=`ส่งออก ${n+1}/${ok.length}`}
-  const w=await(await out.getFileHandle('สรุป.csv',{create:true})).createWritable();await w.write(csv);await w.close();
-  $('exs').textContent=`เสร็จแล้ว ${ok.length} เหตุการณ์`};
-// ---------- แท็บ 2: บันทึกทะเบียน → PTM ----------
-const Q=[];let qc=-1,qview='car',qurl=null,zs=1,zx0=0,zy0=0,pd=null,lastQT='';
-const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-function tab(n){$('t1').hidden=n!=1;$('t2').hidden=n!=2;$('tab1').classList.toggle('on',n==1);$('tab2').classList.toggle('on',n==2)}
-$('tab1').onclick=()=>tab(1);$('tab2').onclick=()=>tab(2);
-$('tys').innerHTML=[...$('pty').options].filter(o=>o.value).map(o=>`<option value="${o.value}">`).join('');
-const LB=['ก่อนกระทำผิด','ระหว่างกระทำผิด','ภาพทะเบียน'];
-const mkQ=(imgs,name)=>({imgs,name:name||(imgs[0]&&imgs[0].name)||'',t:'',f:'',n:'',v:'',done:false});
-function qAdd(fs){fs=[...fs].filter(f=>/^image\//.test(f.type)).sort((a,b)=>(a.name||'').localeCompare(b.name||'',undefined,{numeric:true}));
-  if(!fs.length)return;
-  if($('qpair').checked){for(let i=0;i<fs.length;i+=3)Q.push(mkQ([fs[i],fs[i+1]||null,fs[i+2]||null]))}else fs.forEach(f=>Q.push(mkQ([f,null,null])));
-  if(qc<0)qsel(0);else qRender()}
-function qRender(){$('qlist').innerHTML=Q.map((q,k)=>`<div class="ev ${k==qc?'sel ':''}${q.done?'y':''}" onclick="qsel(${k})">#${k+1} · ${esc([q.f&&q.n?q.f+' '+q.n:q.f||q.n,q.v].filter(Boolean).join(' · ')||'ยังไม่กรอก')}</div>`).join('')||'<div class="m">ยังไม่มีรายการ</div>'}
-function qsel(k){qc=k;const q=Q[k];qview=q.imgs[2]?2:q.imgs[1]?1:0;$('qt').value=q.t||lastQT;$('qf').value=q.f;$('qn').value=q.n;$('qv').value=q.v;qRender();qShow()}
-function qShow(){const q=Q[qc];if(!q)return;if(qurl)URL.revokeObjectURL(qurl);qurl=URL.createObjectURL(q.imgs[qview]||q.imgs[0]);
-  const im=$('qimg');im.onload=zfit;im.src=qurl;[0,1,2].forEach(k=>{$('qb'+k).disabled=!q.imgs[k];$('qb'+k).classList.toggle('on',k===qview)})}
-const zApply=()=>$('qimg').style.transform=`translate(${zx0}px,${zy0}px) scale(${zs})`;
-function zfit(){const im=$('qimg'),r=$('qzv').getBoundingClientRect();if(!im.naturalWidth||!r.width)return;
-  zs=Math.min(r.width/im.naturalWidth,r.height/im.naturalHeight);zx0=(r.width-im.naturalWidth*zs)/2;zy0=(r.height-im.naturalHeight*zs)/2;zApply()}
-function zoom(k,mx,my){const r=$('qzv').getBoundingClientRect();mx=mx??r.width/2;my=my??r.height/2;const ns=Math.min(30,Math.max(.1,zs*k));zx0=mx-(mx-zx0)*ns/zs;zy0=my-(my-zy0)*ns/zs;zs=ns;zApply()}
-$('qzv').onwheel=e=>{e.preventDefault();const r=$('qzv').getBoundingClientRect();zoom(e.deltaY<0?1.2:1/1.2,e.clientX-r.left,e.clientY-r.top)};
-$('qzv').onpointerdown=e=>{pd=[e.clientX-zx0,e.clientY-zy0];$('qzv').setPointerCapture(e.pointerId)};
-$('qzv').onpointermove=e=>{if(!pd)return;zx0=e.clientX-pd[0];zy0=e.clientY-pd[1];zApply()};
-$('qzv').onpointerup=()=>pd=null;
-$('zin').onclick=()=>zoom(1.3);$('zout').onclick=()=>zoom(1/1.3);$('zfit').onclick=zfit;
-[0,1,2].forEach(k=>$('qb'+k).onclick=()=>{qview=k;qShow()});
-[['qt','t'],['qf','f'],['qn','n'],['qv','v']].forEach(([id,k])=>$(id).addEventListener('input',()=>{const q=Q[qc];if(!q)return;q[k]=$(id).value.trim();if(k==='t')lastQT=q.t;q.done=false;qRender()}));
-$('qf').onkeydown=e=>{if(e.key==='Enter')$('qn').focus()};
-$('qn').onkeydown=e=>{if(e.key==='Enter')$('qv').focus()};
-$('qv').onkeydown=e=>{if(e.key==='Enter')qSend()};
-async function qSend(){const q=Q[qc];if(!q)return;if(!q.n){$('qst').textContent='ยังไม่ได้กรอกเลขทะเบียน';return}
-  const d={_uturn:1,id:Date.now(),type:q.t,f:q.f,n:q.n,prov:q.v};
-  try{await navigator.clipboard.writeText(JSON.stringify(d))}catch(e){$('qst').textContent='คัดลอกไม่สำเร็จ: '+e.message;return}
-  q.done=true;$('qst').textContent='คัดลอกแล้ว — สลับไปแท็บ PTM ให้สคริปต์เติมฟอร์ม';
-  if(qc<Q.length-1){qsel(qc+1);$('qf').focus()}else qRender()}
-$('qsend').onclick=qSend;
-$('qskip').onclick=()=>{if(qc<Q.length-1)qsel(qc+1)};
-$('qdel').onclick=()=>{if(qc<0)return;Q.splice(qc,1);qc=Math.min(qc,Q.length-1);if(qc>=0)qsel(qc);else{qRender();$('qimg').removeAttribute('src')}};
-$('qcsv').onclick=()=>{const rows=['\ufeffลำดับ,ประเภทรถ,หมวด,เลข,จังหวัด,ภาพ,ส่งแล้ว'];
-  Q.forEach((q,i)=>rows.push([i+1,q.t,q.f,q.n,q.v,q.name,q.done?'ใช่':''].map(x=>`"${String(x).replace(/"/g,'""')}"`).join(',')));
-  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([rows.join('\n')],{type:'text/csv'}));a.download='ทะเบียน.csv';a.click()};
-$('qadd').onclick=()=>$('qfile').click();$('qfile').onchange=e=>{qAdd(e.target.files);e.target.value=''};
-['dragover','dragenter'].forEach(t=>document.addEventListener(t,e=>{if(!$('t2').hidden){e.preventDefault();$('qdrop').classList.add('on')}}));
-['dragleave','drop'].forEach(t=>document.addEventListener(t,()=>$('qdrop').classList.remove('on')));
-document.addEventListener('drop',e=>{if($('t2').hidden)return;e.preventDefault();qAdd(e.dataTransfer.files)});
-document.addEventListener('paste',e=>{if($('t2').hidden)return;const fs=[...e.clipboardData.files];if(fs.length)qAdd(fs)});
-$('tosend').onclick=async()=>{const ok=events.filter(e=>e.ok);if(!ok.length)return alert('ยังไม่มีเหตุการณ์ที่ยืนยัน');
-  $('tosend').disabled=true;tab(2);
-  for(const e of ok){const t=three(e),p0=e.plate||{},it=mkQ([await jpg(t.bf),await jpg(t.du),await jpg(t.pl)],nm(e.e));
-    it.imgs.forEach((b,k)=>b.name=['1_ก่อนกระทำผิด','2_ระหว่างกระทำผิด','3_ทะเบียน'][k]+'.jpg');
-    it.t=p0.t||'';it.f=p0.f||'';it.n=p0.n||'';it.v=p0.v||'';Q.push(it)}
-  $('tosend').disabled=false;if(qc<0)qsel(0);else qRender()};
-</script></body></html>
+$('exp').onclick=async()=>{
+  const list=[];for(const it of items)for(const e of it.events)if(e.ok===true)list.push([it,e]);
+  if(!list.length)return;
+  let root;try{root=await showDirectoryPicker({mode:'readwrite'})}catch(err){return}
+  const o=S();
+  let csv='\ufeffหมวด,ไฟล์วิดีโอ,จุดเริ่ม,จุดจบ,มุมกลับรถ,ประเภทรถ,หมวดทะเบียน,เลข,จังหวัด,โฟลเดอร์\n';
+  for(let n=0;n<list.length;n++){
+    const [it,e]=list[n],p=e.plate;
+    $('exs').textContent=`ส่งออก ${n+1}/${list.length}…`;
+    const cdir=await root.getDirectoryHandle(safe(it.cat),{create:true});
+    const plateTxt=[p.f&&p.n?p.f+p.n:(p.f||p.n),p.v].filter(Boolean).join('-');
+    const folder=`เหตุการณ์_${String(n+1).padStart(3,'0')}${plateTxt?'_'+safe(plateTxt):''}`;
+    const dir=await cdir.getDirectoryHandle(folder,{create:true});
+    const v=await ensureVid(it),last=Math.max(0,Math.floor(v.duration/it.step)-1);
+    const pre=Math.round(o.pre/it.step),post=Math.round(o.post/it.step);
+    const before=Math.max(0,e.s-pre),mid=Math.round((e.s+e.e)/2);
+    const idx=o.all
+      ? Array.from({length:Math.max(1,Math.min(last,e.e+post)-before+1)},(_,k)=>before+k)
+      : [...new Set([before,mid,e.e])];
+    for(const i of idx){
+      const bmp=await getFrame(v,i*it.step),c=document.createElement('canvas');
+      c.width=bmp.width;c.height=bmp.height;c.getContext('2d').drawImage(bmp,0,0);bmp.close();
+      const blob=await new Promise(r=>c.toBlob(r,'image/jpeg',0.93));
+      let label='';
+      if(!o.all)label=i===before?'1_ก่อนกระทำผิด_':i===e.e?'3_ทะเบียน_':i===mid?'2_ระหว่างกระทำผิด_':'';
+      else if(i===e.e)label='3_ทะเบียน_';
+      const fn=label+safe(it.name.replace(/\.[^.]+$/,''))+'_'+fmtT(i*it.step).replace(/:/g,'-')+'.jpg';
+      const fh=await dir.getFileHandle(fn,{create:true}),w=await fh.createWritable();
+      await w.write(blob);await w.close();
+    }
+    csv+=[it.cat,it.name,fmtT(e.s*it.step),fmtT(e.e*it.step),e.ang?Math.round(e.ang):'A→B',p.t,p.f,p.n,p.v,folder].map(csvq).join(',')+'\n';
+  }
+  const w=await(await root.getFileHandle('สรุป.csv',{create:true})).createWritable();
+  await w.write(csv);await w.close();
+  $('exs').textContent=`เสร็จแล้ว ${list.length} เหตุการณ์ → ${root.name}`;
+};
+$('exall').onchange=()=>{};
+
+// ---------- เริ่มทำงาน ----------
+window.onbeforeunload=e=>{if(running){e.preventDefault();e.returnValue=''}};
+$('provs').innerHTML=PROV.map(p=>`<option value="${p}">`).join('');
+$('pty').innerHTML=$('pty').innerHTML; // คงตัวเลือกประเภทรถไว้
+renderAll();
+fetch('yolov8n.onnx').then(r=>r.ok?r.arrayBuffer():Promise.reject()).then(loadModel)
+  .catch(()=>pill('เลือกไฟล์โมเดล yolov8n.onnx (ถ้าเปิดไฟล์โดยตรงจะโหลดให้อัตโนมัติไม่ได้)',false));
+</script>
+</body>
+</html>
