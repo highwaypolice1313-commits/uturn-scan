@@ -66,12 +66,16 @@ canvas{max-width:100%;display:block;background:#000;border-radius:8px}
 .plate{display:grid;grid-template-columns:minmax(0,1fr) 250px;gap:14px;margin-top:14px}
 .plate .f{display:flex;flex-direction:column;gap:8px}
 .plate input,.plate select{width:100%}
+.orow{display:grid;grid-template-columns:200px minmax(0,1fr) auto;gap:14px;align-items:center;padding:10px;border:1px solid var(--bd);background:var(--sf2);border-radius:10px;margin-bottom:8px}
+.orow img{width:200px;max-height:90px;object-fit:contain;background:#000;border-radius:6px}
+.ores{font-size:14px}
 [hidden]{display:none!important}
 @media(max-width:900px){
   .layout,.rv{grid-template-columns:1fr}
   aside{border-right:0;border-bottom:1px solid var(--bd)}
   .plate{grid-template-columns:1fr}
   .qi{grid-template-columns:1fr 1fr}
+  .orow{grid-template-columns:1fr}
 }
 </style>
 </head>
@@ -108,6 +112,7 @@ canvas{max-width:100%;display:block;background:#000;border-radius:8px}
     <button class="tab on" data-v="queue">1. คิววิดีโอ</button>
     <button class="tab" data-v="zones">2. โซนกลับรถ</button>
     <button class="tab" data-v="review">3. ตรวจทานและส่งออก</button>
+    <button class="tab" data-v="ocr">4. อ่านทะเบียน</button>
   </div>
 
   <!-- ===== คิว ===== -->
@@ -242,6 +247,24 @@ canvas{max-width:100%;display:block;background:#000;border-radius:8px}
       </div>
     </div>
   </section>
+
+  <!-- ===== อ่านทะเบียน ===== -->
+  <section class="view" id="v-ocr" hidden>
+    <div class="card">
+      <h2>อ่านทะเบียนและจำแนกประเภท</h2>
+      <div class="mu">อ่านเฉพาะเหตุการณ์ที่กด Y ยืนยันแล้ว ควรทำหลังตรวจเสร็จทั้งหมด ผลที่อ่านได้จะเติมในหน้าตรวจทานให้แก้ก่อนส่งออกเสมอ</div>
+      <div class="row" style="margin:12px 0">
+        <label>หมวด <select id="ocCat"></select></label>
+        <label><input type="checkbox" id="ocOnlyNew" checked> เฉพาะที่ยังไม่มีทะเบียน</label>
+        <button id="ocRun" class="pri">เริ่มอ่านทั้งหมด</button>
+        <button id="ocStop" class="dng" disabled>หยุด</button>
+        <span id="ocCnt" class="mu"></span>
+      </div>
+      <div class="bar big"><i id="ocBar"></i></div>
+      <div id="ocMsg" class="mu" style="margin-bottom:10px"></div>
+      <div id="ocList"></div>
+    </div>
+  </section>
 </main>
 </div>
 
@@ -264,6 +287,7 @@ const VTYPES=[...Object.keys(VCODE),'อื่นๆ'];
 const PROV='กรุงเทพมหานคร กระบี่ กาญจนบุรี กาฬสินธุ์ กำแพงเพชร ขอนแก่น จันทบุรี ฉะเชิงเทรา ชลบุรี ชัยนาท ชัยภูมิ ชุมพร เชียงราย เชียงใหม่ ตรัง ตราด ตาก นครนายก นครปฐม นครพนม นครราชสีมา นครศรีธรรมราช นครสวรรค์ นนทบุรี นราธิวาส น่าน บึงกาฬ บุรีรัมย์ ปทุมธานี ประจวบคีรีขันธ์ ปราจีนบุรี ปัตตานี พระนครศรีอยุธยา พะเยา พังงา พัทลุง พิจิตร พิษณุโลก เพชรบุรี เพชรบูรณ์ แพร่ ภูเก็ต มหาสารคาม มุกดาหาร แม่ฮ่องสอน ยโสธร ยะลา ร้อยเอ็ด ระนอง ระยอง ราชบุรี ลพบุรี ลำปาง ลำพูน เลย ศรีสะเกษ สกลนคร สงขลา สตูล สมุทรปราการ สมุทรสงคราม สมุทรสาคร สระแก้ว สระบุรี สิงห์บุรี สุโขทัย สุพรรณบุรี สุราษฎร์ธานี สุรินทร์ หนองคาย หนองบัวลำภู อ่างทอง อำนาจเจริญ อุดรธานี อุตรดิตถ์ อุทัยธานี อุบลราชธานี'.split(' ');
 
 let items=[],uid=0,filterCat='all',running=false,stopF=false,session=null,vcls=null,ocrW=null;
+let ocrBusy=false,ocrStopF=false;
 let RUN={total:0,doneN:0};
 let cats=JSON.parse(localStorage.uCats||'null')||['ทั่วไป'];
 let zonesAll=JSON.parse(localStorage.uZones||'{}');
@@ -313,7 +337,7 @@ $('pickCls').onclick=()=>$('cf').click();
 $('cf').onchange=async e=>{const f=e.target.files[0];if(f)await loadClsModel(await f.arrayBuffer())};
 
 // ---------- วิดีโอ & เฟรม ----------
-// key 'p' = ใช้ตอนประมวลผล, key 'r' = ใช้ตอนตรวจทาน/โซน/ส่งออก (แยกกันเพื่อไม่ชนกัน)
+// key 'p' = ใช้ตอนประมวลผล, key 'r' = ใช้ตอนตรวจทาน/โซน/ส่งออก/อ่านทะเบียน
 function codecMsg(err){return err&&err.code===4?'Chrome เปิดไฟล์นี้ไม่ได้ (มักเป็น H.265/HEVC, MKV, AVI) — แปลงเป็น MP4 (H.264) ก่อน':'เปิดวิดีโอไม่ได้'}
 function ensureVid(it,key){
   if(it[key])return Promise.resolve(it[key]);
@@ -325,7 +349,6 @@ function ensureVid(it,key){
     v.src=it.url;
   });
 }
-// ปล่อยวิดีโอเพื่อคืนหน่วยความจำและทรัพยากรถอดรหัส
 function releaseVid(it,key){
   const v=it[key];if(!v)return;
   try{v.pause();v.removeAttribute('src');v.load()}catch(e){}
@@ -338,7 +361,6 @@ function seek(v,t){return new Promise(r=>{
   const to=setTimeout(done,3000);
   v.addEventListener('seeked',done);v.currentTime=tt;
 })}
-// เรียงคิวต่อวิดีโอ + timeout + ลองใหม่หนึ่งครั้ง
 function getFrame(v,t){
   const job=async()=>{
     for(let k=0;k<2;k++){
@@ -350,7 +372,7 @@ function getFrame(v,t){
   v._q=p.catch(()=>{});return p;
 }
 
-// ---------- โซน (จำถาวร + โซนกลาง) ----------
+// ---------- โซน ----------
 function zonesOf(c){
   const z=zonesAll[c]||zonesAll['*']||{a:[],b:[]};
   return JSON.parse(JSON.stringify(z));
@@ -468,7 +490,6 @@ function evalTrack(C,t){
 }
 
 // ---------- ภาพสด & ภาพที่ตรวจเจอ ----------
-// กล่องภาพที่ตรวจเจอจะแสดงเมื่อ ติ๊กภาพสด หรือ มีภาพตัวอย่างที่ตรวจเจอแล้ว
 function refreshLiveBox(){
   const on=$('lvon').checked;
   $('lvwrap').hidden=!on;
@@ -519,8 +540,11 @@ function prog(it,i,n,t0,det,evn){
   $('ovT').textContent=`ไฟล์ ${RUN.doneN+1}/${RUN.total} · ${it.name} · ผ่านไป ${fmtSec(sec)}`;
 }
 
-// ---------- จำแนกประเภทรถ & อ่านทะเบียน ----------
-async function getOcr(){if(!ocrW)ocrW=await withTO(Tesseract.createWorker('tha+eng'),60000,'โหลด OCR ไม่สำเร็จ');return ocrW}
+// ---------- OCR & จำแนกประเภท (ทำในแท็บ 4 เท่านั้น) ----------
+async function getOcr(){
+  if(!ocrW){console.log('กำลังโหลด OCR…');ocrW=await withTO(Tesseract.createWorker('tha+eng'),60000,'โหลด OCR ไม่สำเร็จ');console.log('โหลด OCR เสร็จ')}
+  return ocrW;
+}
 const TH2AR={'๐':'0','๑':'1','๒':'2','๓':'3','๔':'4','๕':'5','๖':'6','๗':'7','๘':'8','๙':'9'};
 function prepPlate(src){
   const s=Math.min(3,Math.max(1,200/src.height)),c=document.createElement('canvas');
@@ -560,21 +584,98 @@ async function classifyVehicle(src){
   let best=0;for(let k=1;k<ex.length;k++)if(ex[k]>ex[best])best=k;
   return{type:VTYPES[best]||'',p:ex[best]/sum};
 }
-async function autoRead(it,e,v){
+// อ่านทะเบียนของเหตุการณ์หนึ่ง เติมค่าให้ e.auto และ e.plate (ถ้ายังว่าง)
+async function ocrOne(it,e){
+  const v=await ensureVid(it,'r');
   const q=e.t.find(p=>p.i===e.e)||e.t[e.t.length-1];
   const bmp=await getFrame(v,e.e*it.step);
-  let cls=null,pl={f:'',n:'',v:'',raw:''};
-  try{cls=await classifyVehicle(cropBox(bmp,q.b,0.1))}catch(err){console.warn(err)}
-  try{pl=await ocrPlate(cropBox(bmp,plateBox(q.b)))}catch(err){console.warn(err)}
-  bmp.close();
-  e.auto={...pl,type:cls?cls.type:'',conf:cls?cls.p:0};
-  if(!e.plate.n&&pl.n)e.plate={t:e.auto.type||e.plate.t,f:pl.f,n:pl.n,v:pl.v};
-  else if(!e.plate.t&&cls)e.plate.t=cls.type;
+  try{
+    const pc=cropBox(bmp,plateBox(q.b));
+    e.plateImg=pc.toDataURL('image/jpeg',0.85);
+    let cls=null,pl={f:'',n:'',v:'',raw:''};
+    try{cls=await classifyVehicle(cropBox(bmp,q.b,0.1))}catch(err){console.warn('cls',err)}
+    try{pl=await ocrPlate(pc)}catch(err){console.warn('ocr',err)}
+    e.auto={...pl,type:cls?cls.type:'',conf:cls?cls.p:0};
+    if(!e.plate.n&&pl.n)e.plate={t:e.auto.type||e.plate.t,f:pl.f,n:pl.n,v:pl.v};
+    else if(!e.plate.t&&cls)e.plate.t=cls.type;
+  }finally{bmp.close()}
 }
+function ocrTargets(){
+  const cf=$('ocCat').value,only=$('ocOnlyNew').checked,list=[];
+  for(const it of items){
+    if(it.status!=='done')continue;
+    if(cf!=='all'&&it.cat!==cf)continue;
+    it.events.forEach((e,k)=>{if(e.ok===true&&(!only||!e.plate.n))list.push([it,k])});
+  }
+  return list;
+}
+function renderOcr(){
+  const list=ocrTargets();
+  $('ocCnt').textContent=`รายการ ${list.length} เหตุการณ์`;
+  let h='';
+  for(const [it,k] of list){
+    const e=it.events[k];
+    const res=e.ocrState==='err'?`<span style="color:var(--no)">อ่านไม่สำเร็จ: ${esc(e.ocrErr)}</span>`
+      :e.auto?`${esc(e.auto.f||'-')} ${esc(e.auto.n||'-')} ${esc(e.auto.v||'')} · ประเภทที่ทาย: ${esc(e.auto.type||'-')}${e.auto.conf?' ('+Math.round(e.auto.conf*100)+'%)':''}`
+      :'<span class="mu">ยังไม่อ่าน</span>';
+    h+=`<div class="orow">
+      ${e.plateImg?`<img src="${e.plateImg}" alt="">`:'<div class="mu">ยังไม่มีภาพป้าย</div>'}
+      <div style="min-width:0">
+        <div class="fn" title="${esc(it.name)}">${esc(it.name)}</div>
+        <div class="mu">${esc(it.cat)} · ${fmtT(e.s*it.step)} → ${fmtT(e.e*it.step)}</div>
+        <div class="ores">${res}</div>
+        <div class="mu">ทะเบียนที่บันทึก: ${esc(e.plate.f)} ${esc(e.plate.n)} ${esc(e.plate.v)} ${e.plate.t?'· '+esc(e.plate.t):''}</div>
+      </div>
+      <button data-ocr-it="${it.id}" data-ocr-k="${k}" ${ocrBusy?'disabled':''}>อ่านนี้</button>
+    </div>`;
+  }
+  $('ocList').innerHTML=h||'<div class="empty">ไม่มีเหตุการณ์ให้อ่าน — ต้องกด Y ยืนยันในแท็บ 3 ก่อน หรือเลือก "เฉพาะที่ยังไม่มีทะเบียน" ออก</div>';
+  $('ocRun').disabled=ocrBusy||running;
+  $('ocStop').disabled=!ocrBusy;
+}
+async function ocrRunOne(it,k){
+  const e=it.events[k];
+  e.ocrState='run';renderOcr();
+  try{
+    await withTO(ocrOne(it,e),30000,'OCR หมดเวลา (30 วิ)');
+    e.ocrState='done';
+  }catch(err){e.ocrState='err';e.ocrErr=err.message||String(err)}
+}
+async function runOcrAll(){
+  if(running)return alert('กำลังตรวจวิดีโออยู่ — รอให้เสร็จหรือกดหยุดก่อน');
+  if(ocrBusy)return;
+  const list=ocrTargets();
+  if(!list.length)return;
+  ocrBusy=true;ocrStopF=false;renderOcr();
+  for(let n=0;n<list.length&&!ocrStopF;n++){
+    const [it,k]=list[n];
+    $('ocBar').style.width=(n/list.length*100)+'%';
+    $('ocMsg').textContent=`กำลังอ่าน ${n+1}/${list.length} · ${it.name}`;
+    await ocrRunOne(it,k);
+    const nxt=list[n+1];
+    if(!nxt||nxt[0]!==it)releaseVid(it,'r');
+    renderOcr();
+  }
+  ocrBusy=false;
+  $('ocBar').style.width=ocrStopF?$('ocBar').style.width:'100%';
+  $('ocMsg').textContent=ocrStopF?'หยุดแล้ว — ผลที่อ่านได้แล้วยังอยู่':'อ่านเสร็จแล้ว ไปตรวจค่าในแท็บ 3 ก่อนส่งออก';
+  renderOcr();
+}
+$('ocRun').onclick=runOcrAll;
+$('ocStop').onclick=()=>{ocrStopF=true;$('ocMsg').textContent='กำลังหยุด…'};
+$('ocCat').onchange=renderOcr;
+$('ocOnlyNew').onchange=renderOcr;
+$('ocList').addEventListener('click',async e=>{
+  const b=e.target.closest('[data-ocr-it]');if(!b||ocrBusy||running)return;
+  const it=items.find(i=>i.id==b.dataset.ocrIt);if(!it)return;
+  ocrBusy=true;renderOcr();
+  await ocrRunOne(it,+b.dataset.ocrK);
+  releaseVid(it,'r');
+  ocrBusy=false;renderOcr();
+});
 
 // ---------- ประมวลผลวิดีโอหนึ่งไฟล์ ----------
 async function processItem(it){
-  // ปล่อยวิดีโอของไฟล์อื่นก่อน เพื่อไม่ให้ค้างทรัพยากรถอดรหัส
   items.forEach(x=>{if(x!==it){releaseVid(x,'p');releaseVid(x,'r')}});
   const v=await ensureVid(it,'p'),o=S(),n=Math.max(1,Math.floor(v.duration/o.step));
   it.step=o.step;it.dur=v.duration;
@@ -601,8 +702,8 @@ async function processItem(it){
   }
   closeStale(C,0,true);
   await thumbNew(C,v,it);
-  it.events=C.evs.sort((a,b)=>a.s-b.s).map(e=>({...e,ok:null,plate:{t:'',f:'',n:'',v:''},auto:null}));
-  for(const e of it.events){try{await autoRead(it,e,v)}catch(err){console.warn('autoRead',err)}}
+  it.events=C.evs.sort((a,b)=>a.s-b.s).map(e=>({...e,ok:null,plate:{t:'',f:'',n:'',v:''},auto:null,plateImg:null,ocrState:null,ocrErr:''}));
+  console.log('เสร็จลูปเฟรม',it.name,'พบ',it.events.length,'เหตุการณ์');
   releaseVid(it,'p');
 }
 
@@ -610,13 +711,14 @@ async function processItem(it){
 function runnable(i,cat){return i.status==='wait'&&(!cat||cat==='all'||i.cat===cat)}
 async function runQueue(cat){
   if(running)return;
+  if(ocrBusy)return alert('กำลังอ่านทะเบียนอยู่ — รอให้เสร็จก่อน');
   if(!session)return alert('โมเดลตรวจรถยังไม่พร้อม — เลือกไฟล์ yolov8n.onnx ก่อน');
   RUN={total:items.filter(i=>runnable(i,cat)).length,doneN:0};
   if(!RUN.total)return;
   running=true;stopF=false;updBtns();
   while(!stopF){const it=items.find(i=>runnable(i,cat));if(!it)break;await runOne(it)}
   running=false;
-  $('ovT').textContent=stopF?'หยุดแล้ว — ไฟล์ที่ยังไม่เสร็จจะกลับเข้าคิว':`เสร็จทั้งหมด ${RUN.doneN} ไฟล์`;
+  $('ovT').textContent=stopF?'หยุดแล้ว — ไฟล์ที่ยังไม่เสร็จจะกลับเข้าคิว':`เสร็จทั้งหมด ${RUN.doneN} ไฟล์ — ไปแท็บ 4 เพื่ออ่านทะเบียน`;
   if(!stopF)$('ovBar').style.width='100%';
   $('stop').textContent='หยุด';
   renderAll();
@@ -699,11 +801,12 @@ function renderCats(){
   const opts=cats.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');
   keepSel($('catSel'),opts);keepSel($('zcat'),opts);
   keepSel($('rvCat'),`<option value="all">ทุกหมวด</option>`+opts);
+  keepSel($('ocCat'),`<option value="all">ทุกหมวด</option>`+opts);
 }
 $('cats').onclick=e=>{
   const d=e.target.closest('[data-cat]');if(!d)return;
   filterCat=d.dataset.cat;
-  if(filterCat!=='all'){$('catSel').value=filterCat;$('rvCat').value=filterCat}
+  if(filterCat!=='all'){$('catSel').value=filterCat;$('rvCat').value=filterCat;$('ocCat').value=filterCat}
   renderAll();
 };
 $('addCat').onclick=()=>{
@@ -722,16 +825,18 @@ function renderStats(){
 }
 function updBtns(){
   const waiting=items.filter(i=>i.status==='wait');
-  $('runAll').disabled=running||!session||!waiting.length;
+  $('runAll').disabled=running||ocrBusy||!session||!waiting.length;
   const hasCat=waiting.some(i=>filterCat==='all'||i.cat===filterCat);
-  $('runCat').disabled=running||!session||!hasCat||filterCat==='all';
+  $('runCat').disabled=running||ocrBusy||!session||!hasCat||filterCat==='all';
   $('runCat').textContent=filterCat==='all'?'เริ่มเฉพาะหมวด (เลือกหมวดก่อน)':`เริ่มหมวด "${filterCat}"`;
   $('stop').disabled=!running;
   $('exp').disabled=!items.some(i=>i.events.some(e=>e.ok===true));
+  $('ocRun').disabled=ocrBusy||running;
 }
 function renderAll(){
   renderCats();renderQueue();renderStats();updBtns();
   if(!$('v-review').hidden)renderReview();
+  if(!$('v-ocr').hidden)renderOcr();
 }
 
 // ---------- แท็บ ----------
@@ -740,6 +845,7 @@ document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('.view').forEach(v=>v.hidden=v.id!=='v-'+b.dataset.v);
   if(b.dataset.v==='zones')zoneSync();
   if(b.dataset.v==='review'){renderReview();showRV()}
+  if(b.dataset.v==='ocr')renderOcr();
 });
 $('lvon').addEventListener('change',()=>{refreshLiveBox();saveSet()});
 
@@ -821,7 +927,8 @@ function fillPlate(e){
   const p=e.plate;
   $('pty').value=p.t||lastType;$('pf').value=p.f;$('pn').value=p.n;$('pv').value=p.v;
   const a=e.auto;
-  $('autoinfo').textContent=a?`ระบบอ่านได้: ${a.f||'-'} ${a.n||'-'} ${a.v||''}${a.type?' · ประเภทที่ทาย: '+a.type+' ('+Math.round(a.conf*100)+'%)':''} — ตรวจก่อนยืนยันเสมอ`:(vcls?'':'ยังไม่มีโมเดลประเภทรถ ระบบจะอ่านเฉพาะทะเบียน');
+  $('autoinfo').textContent=a?`ระบบอ่านได้: ${a.f||'-'} ${a.n||'-'} ${a.v||''}${a.type?' · ประเภทที่ทาย: '+a.type+' ('+Math.round(a.conf*100)+'%)':''} — ตรวจก่อนยืนยันเสมอ`
+    :'ยังไม่ได้อ่านทะเบียน — ไปที่แท็บ 4 เพื่ออ่านทั้งหมดหลังตรวจเสร็จ';
 }
 function savePlate(){
   const e=curEv();if(!e)return;
@@ -915,7 +1022,7 @@ $('exp').onclick=async()=>{
 };
 
 // ---------- เริ่มทำงาน ----------
-window.onbeforeunload=e=>{if(running){e.preventDefault();e.returnValue=''}};
+window.onbeforeunload=e=>{if(running||ocrBusy){e.preventDefault();e.returnValue=''}};
 $('provs').innerHTML=PROV.map(p=>`<option value="${p}">`).join('');
 $('pty').innerHTML='<option value="">ประเภทรถ...</option>'+VTYPES.map(t=>`<option value="${esc(t)}">${esc(t)}${VCODE[t]?' ('+VCODE[t]+')':''}</option>`).join('');
 loadSet();
