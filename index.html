@@ -52,6 +52,9 @@ input[type=number]{width:76px}
 .st.err{background:#2a1214;color:var(--no)}
 canvas{max-width:100%;display:block;background:#000;border-radius:8px}
 #zc{cursor:crosshair}
+#evth{display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;margin-top:10px}
+.th{flex:0 0 150px;font-size:11px;color:var(--mu)}
+.th img{width:150px;border-radius:6px;border:1px solid var(--ac);display:block;margin-bottom:3px}
 .rv{display:grid;grid-template-columns:300px minmax(0,1fr);gap:14px;align-items:start}
 .evpane{max-height:72vh;overflow:auto;padding:10px}
 .gh{font-size:12px;color:var(--ac);margin:10px 4px 6px;font-weight:600}
@@ -94,7 +97,7 @@ canvas{max-width:100%;display:block;background:#000;border-radius:8px}
     <input id="newCat" placeholder="ชื่อหมวดใหม่" style="flex:1">
     <button id="addCat">เพิ่ม</button>
   </div>
-  <div class="mu" style="margin-top:14px">คลิกหมวดเพื่อกรองคิวและผลลัพธ์ วิดีโอใหม่จะเข้าหมวดที่เลือกอยู่ โซนกลับรถก็แยกตามหมวด</div>
+  <div class="mu" style="margin-top:14px">คลิกหมวดเพื่อกรองคิวและผลลัพธ์ วิดีโอใหม่จะเข้าหมวดที่เลือกอยู่ โซนกลับรถแยกตามหมวด และหมวดที่ยังไม่มีโซนจะใช้โซนกลาง</div>
 </aside>
 
 <main>
@@ -122,7 +125,7 @@ canvas{max-width:100%;display:block;background:#000;border-radius:8px}
     </div>
 
     <div class="card">
-      <h2>ตั้งค่าการตรวจ</h2>
+      <h2>ตั้งค่าการตรวจ <span class="mu">(ระบบจำค่าไว้ให้อัตโนมัติ)</span></h2>
       <div class="row">
         <label>ตรวจทุก <input type="number" id="step" value="0.5" step="0.5" min="0.2"> วินาที</label>
         <label>ความมั่นใจ <input type="number" id="conf" value="0.35" step="0.05" min="0.1" max="0.9"></label>
@@ -130,9 +133,8 @@ canvas{max-width:100%;display:block;background:#000;border-radius:8px}
         <label>มุมกลับรถ ≥ <input type="number" id="ang" value="120" min="60" max="180">°</label>
         <label>เผื่อก่อน <input type="number" id="pre" value="2" min="0"> วิ</label>
         <label>เผื่อหลัง <input type="number" id="post" value="2" min="0"> วิ</label>
-        <label><input type="checkbox" id="lvon"> แสดงภาพสดขณะรัน</label>
+        <label><input type="checkbox" id="lvon" checked> แสดงภาพสดขณะรัน</label>
       </div>
-      <div class="mu" style="margin-top:6px">ตรวจทุก 1 วินาทีจะเร็วขึ้นมาก เฟรมที่ไม่มีการเคลื่อนไหวจะถูกข้ามอัตโนมัติ</div>
     </div>
 
     <div class="card">
@@ -150,8 +152,12 @@ canvas{max-width:100%;display:block;background:#000;border-radius:8px}
     </div>
 
     <div id="livebox" class="card" hidden>
-      <canvas id="lv" width="640" height="360"></canvas>
-      <div id="lvt" class="mu" style="margin-top:6px"></div>
+      <h2>ภาพที่ระบบตรวจเจอ</h2>
+      <div id="lvwrap">
+        <canvas id="lv" width="640" height="360"></canvas>
+        <div id="lvt" class="mu" style="margin-top:6px"></div>
+      </div>
+      <div id="evth"></div>
     </div>
   </section>
 
@@ -159,7 +165,7 @@ canvas{max-width:100%;display:block;background:#000;border-radius:8px}
   <section class="view" id="v-zones" hidden>
     <div class="card">
       <h2>วาดโซนกลับรถต่อหมวด</h2>
-      <div class="mu">โซน A = จุดที่รถเริ่มกลับรถ · โซน B = จุดที่เห็นทะเบียน ถ้าไม่วาด B ระบบจะใช้มุมกลับรถอย่างเดียว · คลิกซ้ายวางจุด คลิกขวาลบจุดล่าสุด</div>
+      <div class="mu">โซน A = จุดที่รถเริ่มกลับรถ · โซน B = จุดที่เห็นทะเบียน ถ้าไม่วาด B ระบบจะใช้มุมกลับรถอย่างเดียว · คลิกซ้ายวางจุด คลิกขวาลบจุดล่าสุด · โซนถูกบันทึกอัตโนมัติ</div>
       <div class="row" style="margin:12px 0">
         <label>หมวด <select id="zcat"></select></label>
         <label>ภาพตัวอย่างจาก <select id="zsrc"></select></label>
@@ -168,6 +174,7 @@ canvas{max-width:100%;display:block;background:#000;border-radius:8px}
         <button id="za">วาดโซน A</button>
         <button id="zb">วาดโซน B</button>
         <button id="zdone">เสร็จ</button>
+        <button id="zshare">ตั้งเป็นโซนกลาง (ใช้กับหมวดที่ยังไม่มีโซน)</button>
         <button id="zr" class="dng">ล้างโซนของหมวดนี้</button>
         <span id="zmsg" class="mu"></span>
       </div>
@@ -254,10 +261,22 @@ let items=[],uid=0,filterCat='all',running=false,stopF=false,session=null,RUN={t
 let cats=JSON.parse(localStorage.uCats||'null')||['ทั่วไป'];
 let zonesAll=JSON.parse(localStorage.uZones||'{}');
 let REV={id:null,k:-1},fi=0,flat=[],showTok=0,plTok=0,lastType='',zk=null,zSample=null;
+const SET_IDS=['step','conf','mot','ang','pre','post','lvon','exall'];
 
 const ang=(a,b)=>Math.acos(Math.max(-1,Math.min(1,(a[0]*b[0]+a[1]*b[1])/((Math.hypot(...a)*Math.hypot(...b))||1))))*180/Math.PI;
 const poly=(c,z,w,h)=>{c.beginPath();z.forEach(([x,y],i)=>i?c.lineTo(x*w,y*h):c.moveTo(x*w,y*h));if(z.length>2)c.closePath()};
 const S=()=>({step:Math.max(0.2,+$('step').value||0.5),conf:+$('conf').value||0.35,mot:(+$('mot').value||4)/1000,ang:+$('ang').value||120,pre:+$('pre').value||0,post:+$('post').value||0,lost:8,minPts:3,hang:3,live:$('lvon').checked,all:$('exall').checked});
+
+// ---------- การจำค่า ----------
+function loadSet(){
+  const s=JSON.parse(localStorage.uSet||'{}');
+  SET_IDS.forEach(id=>{if(s[id]===undefined)return;const el=$(id);if(el.type==='checkbox')el.checked=s[id];else el.value=s[id]});
+}
+function saveSet(){
+  const s={};SET_IDS.forEach(id=>{const el=$(id);s[id]=el.type==='checkbox'?el.checked:el.value});
+  localStorage.uSet=JSON.stringify(s);
+}
+SET_IDS.forEach(id=>$(id).addEventListener('change',saveSet));
 
 // canvas ทำงานเบื้องหลัง
 const cvs=document.createElement('canvas');cvs.width=cvs.height=640;const dctx=cvs.getContext('2d',{willReadFrequently:true});
@@ -296,14 +315,17 @@ function seek(v,t){return new Promise(r=>{
   const to=setTimeout(done,3000);
   v.addEventListener('seeked',done);v.currentTime=tt;
 })}
-// เรียงคิวต่อวิดีโอ เพื่อไม่ให้ seek ซ้อนกัน
 function getFrame(v,t){
   const p=(v._q||Promise.resolve()).then(async()=>{await seek(v,t);return createImageBitmap(v)});
   v._q=p.catch(()=>{});return p;
 }
 
-// ---------- โซน ----------
-const zonesOf=c=>zonesAll[c]||{a:[],b:[]};
+// ---------- โซน (จำถาวร + โซนกลาง) ----------
+function zonesOf(c){
+  const z=zonesAll[c]||zonesAll['*']||{a:[],b:[]};
+  return JSON.parse(JSON.stringify(z));
+}
+function setZones(c,z){zonesAll[c]=z;saveZones()}
 function saveZones(){localStorage.uZones=JSON.stringify(zonesAll)}
 function inZ(q,z,W,H){
   if(!z||z.length<3)return false;const x=q.cx/W,y=q.b.y2/H;let c=false;
@@ -331,16 +353,18 @@ function drawZone(){
     p.forEach(([x,y])=>{c.beginPath();c.arc(x*w,y*h,Math.max(4,w/200),0,7);c.fill()});
     c.font=`bold ${Math.round(w/28)}px sans-serif`;c.fillText(k.toUpperCase(),p[0][0]*w+8,p[0][1]*h-8);
   }
+  const own=!!zonesAll[cat];
   $('zmsg').textContent=zk?`กำลังวาดโซน ${zk.toUpperCase()} — คลิกวางจุด (อย่างน้อย 3 จุด)`
-    :(z.a.length>2&&z.b.length>2?'มีโซน A และ B — รถต้องผ่าน A แล้วไป B'
-    :z.a.length>2?'มีโซน A — ใช้ร่วมกับมุมกลับรถ':'ยังไม่มีโซน — ใช้มุมกลับรถอย่างเดียว');
+    :(own?'บันทึกแล้ว — ':'ยังไม่มีโซนของหมวดนี้ — ใช้โซนกลาง (ถ้ามี) ')
+     +(z.a.length>2&&z.b.length>2?'มีโซน A และ B':z.a.length>2?'มีโซน A อย่างเดียว':'ยังไม่มีโซน');
 }
 zc.onclick=e=>{if(!zk)return;const r=zc.getBoundingClientRect(),cat=$('zcat').value,z=zonesOf(cat);
-  z[zk].push([(e.clientX-r.left)/r.width,(e.clientY-r.top)/r.height]);zonesAll[cat]=z;saveZones();drawZone()};
-zc.oncontextmenu=e=>{e.preventDefault();if(!zk)return;const cat=$('zcat').value,z=zonesOf(cat);z[zk].pop();zonesAll[cat]=z;saveZones();drawZone()};
-$('za').onclick=()=>{zk='a';const cat=$('zcat').value,z=zonesOf(cat);z.a=[];zonesAll[cat]=z;saveZones();drawZone()};
-$('zb').onclick=()=>{zk='b';const cat=$('zcat').value,z=zonesOf(cat);z.b=[];zonesAll[cat]=z;saveZones();drawZone()};
+  z[zk].push([(e.clientX-r.left)/r.width,(e.clientY-r.top)/r.height]);setZones(cat,z);drawZone()};
+zc.oncontextmenu=e=>{e.preventDefault();if(!zk)return;const cat=$('zcat').value,z=zonesOf(cat);z[zk].pop();setZones(cat,z);drawZone()};
+$('za').onclick=()=>{zk='a';const cat=$('zcat').value,z=zonesOf(cat);z.a=[];setZones(cat,z);drawZone()};
+$('zb').onclick=()=>{zk='b';const cat=$('zcat').value,z=zonesOf(cat);z.b=[];setZones(cat,z);drawZone()};
 $('zdone').onclick=()=>{zk=null;drawZone()};
+$('zshare').onclick=()=>{const cat=$('zcat').value;zonesAll['*']=zonesOf(cat);saveZones();zk=null;drawZone();$('zmsg').textContent='ตั้งเป็นโซนกลางแล้ว หมวดที่ยังไม่มีโซนจะใช้โซนนี้'};
 $('zr').onclick=()=>{zk=null;delete zonesAll[$('zcat').value];saveZones();drawZone()};
 $('zcat').onchange=zoneSync;
 $('zsrc').onchange=loadZonePreview;
@@ -413,27 +437,47 @@ function evalTrack(C,t){
   C.evs.push({s:p[s].i,e:Math.max(p[bi].i,p[s].i),t:p,ang:a});
 }
 
-// ---------- แสดงภาพสด & ความคืบหน้า ----------
+// ---------- ภาพสด & ภาพที่ตรวจเจอ ----------
 function live(bmp,i,dets,C,it){
-  if(lv.width!==bmp.width||lv.height!==bmp.height){lv.width=bmp.width;lv.height=bmp.height}
   $('livebox').hidden=false;
+  if(!$('lvon').checked)return;
+  if(lv.width!==bmp.width||lv.height!==bmp.height){lv.width=bmp.width;lv.height=bmp.height}
   const w=bmp.width,h=bmp.height;
   lctx.drawImage(bmp,0,0);lctx.lineWidth=Math.max(2,w/400);
   for(const k of['a','b']){const z=C.Z[k];if(z&&z.length>2){poly(lctx,z,w,h);lctx.strokeStyle=`rgba(${ZC[k]},.8)`;lctx.setLineDash([8,6]);lctx.stroke();lctx.setLineDash([])}}
   lctx.strokeStyle='#3fb950';
   for(const t of C.tracks){lctx.beginPath();t.pts.forEach((p,k)=>k?lctx.lineTo(p.cx,p.cy):lctx.moveTo(p.cx,p.cy));lctx.stroke()}
-  lctx.strokeStyle='#f5a524';for(const d of dets)lctx.strokeRect(d.x1,d.y1,d.x2-d.x1,d.y2-d.y1);
-  $('lvt').textContent=`${it.name} · ${fmtT(i*C.o.step)} · พบ ${C.evs.length} เหตุการณ์`;
+  lctx.strokeStyle='#f5a524';lctx.lineWidth=Math.max(3,w/250);
+  for(const d of dets)lctx.strokeRect(d.x1,d.y1,d.x2-d.x1,d.y2-d.y1);
+  $('lvt').textContent=`${it.name} · ${fmtT(i*C.o.step)} · ตรวจพบรถ ${dets.length} คัน · พบ ${C.evs.length} เหตุการณ์`;
 }
-function updRow(it,txt){
-  const el=$('r'+it.id);if(!el)return;
-  const bi=el.querySelector('.bar i');if(bi)bi.style.width=it.pct+'%';
-  if(txt)el.querySelector('[data-info]').textContent=txt;
+function thumb(bmp,box){
+  const c=document.createElement('canvas'),s=180/bmp.width;
+  c.width=180;c.height=Math.round(bmp.height*s);
+  const x=c.getContext('2d');x.drawImage(bmp,0,0,c.width,c.height);
+  if(box){x.strokeStyle='#f5a524';x.lineWidth=2;x.strokeRect(box.x1*s,box.y1*s,(box.x2-box.x1)*s,(box.y2-box.y1)*s)}
+  return c.toDataURL('image/jpeg',0.8);
+}
+function addThumbCard(it,e){
+  const d=document.createElement('div');d.className='th';
+  d.innerHTML=`<img src="${e.thumb}" alt=""><div>${esc(it.name)}</div><div>${fmtT(e.e*it.step)}${e.ang?' · '+Math.round(e.ang)+'°':' · A→B'}</div>`;
+  $('evth').prepend(d);
+}
+// สร้างภาพตัวอย่างให้เหตุการณ์ที่เพิ่งพบ แล้วแสดงทันที
+async function thumbNew(C,v,it){
+  while(C.thumbed<C.evs.length){
+    const e=C.evs[C.thumbed++];
+    const bmp=await getFrame(v,e.e*C.o.step);
+    const q=e.t.find(p=>p.i===e.e)||e.t[e.t.length-1];
+    e.thumb=thumb(bmp,q.b);bmp.close();
+    addThumbCard(it,e);
+  }
 }
 function prog(it,i,n,t0,det,evn){
   const pct=(i+1)/n*100;it.pct=pct;
   const sec=(performance.now()-t0)/1000,eta=sec/(i+1)*(n-i-1);
-  updRow(it,`${pct.toFixed(1)}% · ตรวจรถ ${det} เฟรม · พบ ${evn} เหตุการณ์ · เหลือ ~${fmtSec(eta)}`);
+  const el=$('r'+it.id);
+  if(el){el.querySelector('.bar i').style.width=pct+'%';el.querySelector('[data-info]').textContent=`${pct.toFixed(1)}% · ตรวจรถ ${det} เฟรม · พบ ${evn} เหตุการณ์ · เหลือ ~${fmtSec(eta)}`}
   $('ovBar').style.width=((RUN.doneN+pct/100)/Math.max(1,RUN.total)*100)+'%';
   $('ovT').textContent=`ไฟล์ ${RUN.doneN+1}/${RUN.total} · ${it.name} · ผ่านไป ${fmtSec(sec)}`;
 }
@@ -442,7 +486,7 @@ function prog(it,i,n,t0,det,evn){
 async function processItem(it){
   const v=await ensureVid(it),o=S(),n=Math.max(1,Math.floor(v.duration/o.step));
   it.step=o.step;it.dur=v.duration;
-  const C={tracks:[],evs:[],Z:zonesOf(it.cat),o,W:v.videoWidth,H:v.videoHeight};
+  const C={tracks:[],evs:[],thumbed:0,Z:zonesOf(it.cat),o,W:v.videoWidth,H:v.videoHeight};
   let prev=null,hang=0,det=0;const t0=performance.now();
   for(let i=0;i<n&&!stopF;i++){
     const bmp=await getFrame(v,i*o.step);
@@ -457,10 +501,12 @@ async function processItem(it){
     if(hang>0){hang--;det++;dets=await detect(bmp,o.conf);update(C,i,dets,bmp)}
     if(o.live&&(dets.length||i%4===0))live(bmp,i,dets,C,it);
     closeStale(C,i,false);
+    await thumbNew(C,v,it);
     bmp.close();
     if(i%4===0||i===n-1){prog(it,i,n,t0,det,C.evs.length);await new Promise(r=>setTimeout(r,0))}
   }
   closeStale(C,0,true);
+  await thumbNew(C,v,it);
   it.events=C.evs.sort((a,b)=>a.s-b.s).map(e=>({...e,ok:null,plate:{t:'',f:'',n:'',v:''}}));
 }
 
@@ -472,6 +518,7 @@ async function runQueue(cat){
   RUN={total:items.filter(i=>runnable(i,cat)).length,doneN:0};
   if(!RUN.total)return;
   running=true;stopF=false;updBtns();
+  $('livebox').hidden=false;
   while(!stopF){const it=items.find(i=>runnable(i,cat));if(!it)break;await runOne(it)}
   running=false;
   $('ovT').textContent=stopF?'หยุดแล้ว — ไฟล์ที่ยังไม่เสร็จจะกลับเข้าคิว':`เสร็จทั้งหมด ${RUN.doneN} ไฟล์`;
@@ -488,8 +535,8 @@ async function runOne(it){
   }catch(e){console.error(e);it.status='err';it.err=e.message||String(e);RUN.doneN++}
   renderQueue();renderStats();renderCats();updBtns();
 }
-$('runAll').onclick=()=>runQueue(null);
-$('runCat').onclick=()=>runQueue(filterCat);
+$('runAll').onclick=()=>{$('evth').innerHTML='';runQueue(null)};
+$('runCat').onclick=()=>{$('evth').innerHTML='';runQueue(filterCat)};
 $('stop').onclick=()=>{stopF=true;$('stop').textContent='กำลังหยุด…'};
 
 function addFiles(list){
@@ -597,7 +644,7 @@ document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{
   if(b.dataset.v==='zones')zoneSync();
   if(b.dataset.v==='review'){renderReview();showRV()}
 });
-$('lvon').onchange=()=>{$('livebox').hidden=!$('lvon').checked};
+$('lvon').addEventListener('change',()=>{$('lvwrap').hidden=!$('lvon').checked});
 
 // ---------- ตรวจทาน ----------
 const curIt=()=>items.find(i=>i.id===REV.id);
@@ -755,12 +802,12 @@ $('exp').onclick=async()=>{
   await w.write(csv);await w.close();
   $('exs').textContent=`เสร็จแล้ว ${list.length} เหตุการณ์ → ${root.name}`;
 };
-$('exall').onchange=()=>{};
 
 // ---------- เริ่มทำงาน ----------
 window.onbeforeunload=e=>{if(running){e.preventDefault();e.returnValue=''}};
 $('provs').innerHTML=PROV.map(p=>`<option value="${p}">`).join('');
-$('pty').innerHTML=$('pty').innerHTML; // คงตัวเลือกประเภทรถไว้
+loadSet();
+$('lvwrap').hidden=!$('lvon').checked;
 renderAll();
 fetch('yolov8n.onnx').then(r=>r.ok?r.arrayBuffer():Promise.reject()).then(loadModel)
   .catch(()=>pill('เลือกไฟล์โมเดล yolov8n.onnx (ถ้าเปิดไฟล์โดยตรงจะโหลดให้อัตโนมัติไม่ได้)',false));
