@@ -344,8 +344,9 @@ function ensureVid(it,key){
   if(!it.url)it.url=URL.createObjectURL(it.file);
   return new Promise((res,rej)=>{
     const v=document.createElement('video');v.muted=true;v.preload='auto';v.playsInline=true;
-    v.onloadeddata=()=>{it[key]=v;it.dur=it.dur||v.duration;res(v)};
-    v.onerror=()=>rej(new Error(codecMsg(v.error)));
+    const to=setTimeout(()=>rej(new Error('เปิดวิดีโอค้าง (60 วิ) — ลองแปลงเป็น MP4 H.264')),60000);
+    v.onloadeddata=()=>{clearTimeout(to);it[key]=v;it.dur=it.dur||v.duration;res(v)};
+    v.onerror=()=>{clearTimeout(to);rej(new Error(codecMsg(v.error)))};
     v.src=it.url;
   });
 }
@@ -693,7 +694,13 @@ async function processItem(it){
     prev=g;
     if(mv>o.mot)hang=o.hang;
     let dets=[];
-    if(hang>0){hang--;det++;dets=await withTO(detect(bmp,o.conf),15000,'detect timeout');update(C,i,dets,bmp)}
+if(hang>0){
+  hang--;det++;
+  try{
+    dets=await withTO(detect(bmp,o.conf),30000,'detect timeout');
+    update(C,i,dets,bmp);
+  }catch(err){console.warn('detect',i,err);dets=[]}
+}
     if(o.live&&(dets.length||i%4===0))live(bmp,i,dets,C,it);
     closeStale(C,i,false);
     await thumbNew(C,v,it);
