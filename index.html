@@ -990,6 +990,24 @@ document.addEventListener('keydown',e=>{
   else if(k===']')setEnd();
 });
 
+  // ตรวจว่ามีไฟล์/โฟลเดอร์ชื่อนี้อยู่แล้วหรือไม่
+async function nameExists(dir,name,kind){
+  try{
+    if(kind==='dir')await dir.getDirectoryHandle(name);
+    else await dir.getFileHandle(name);
+    return true;
+  }catch(e){
+    if(e.name==='NotFoundError')return false;
+    throw e;
+  }
+}
+// คืนชื่อที่ยังไม่ซ้ำ เช่น "a.jpg" -> "a_2.jpg" -> "a_3.jpg"
+async function uniqueName(dir,base,ext,kind){
+  let name=base+ext,n=2;
+  while(await nameExists(dir,name,kind))name=`${base}_${n++}${ext}`;
+  return name;
+}
+
 // ---------- ส่งออก ----------
 $('exp').onclick=async()=>{
   const list=[];for(const it of items)for(const e of it.events)if(e.ok===true)list.push([it,e]);
@@ -1002,7 +1020,9 @@ $('exp').onclick=async()=>{
     $('exs').textContent=`ส่งออก ${n+1}/${list.length}…`;
     const cdir=await root.getDirectoryHandle(safe(it.cat),{create:true});
     const plateTxt=[p.f&&p.n?p.f+p.n:(p.f||p.n),p.v].filter(Boolean).join('-');
-    const folder=`เหตุการณ์_${String(n+1).padStart(3,'0')}${plateTxt?'_'+safe(plateTxt):''}`;
+    // โฟลเดอร์เหตุการณ์: ถ้าชื่อซ้ำจะสร้างใหม่ต่อท้ายเป็น _2, _3 ไม่ไปรวมกับของเดิม
+    const folderBase=`เหตุการณ์_${String(n+1).padStart(3,'0')}${plateTxt?'_'+safe(plateTxt):''}`;
+    const folder=await uniqueName(cdir,folderBase,'','dir');
     const dir=await cdir.getDirectoryHandle(folder,{create:true});
     const v=await ensureVid(it,'r'),last=Math.max(0,Math.floor(v.duration/it.step)-1);
     const pre=Math.round(o.pre/it.step),post=Math.round(o.post/it.step);
@@ -1017,15 +1037,19 @@ $('exp').onclick=async()=>{
       let label='';
       if(!o.all)label=i===before?'1_ก่อนกระทำผิด_':i===e.e?'3_ทะเบียน_':i===mid?'2_ระหว่างกระทำผิด_':'';
       else if(i===e.e)label='3_ทะเบียน_';
-      const fn=label+safe(it.name.replace(/\.[^.]+$/,''))+'_'+fmtT(i*it.step).replace(/:/g,'-')+'.jpg';
+      const base=label+safe(it.name.replace(/\.[^.]+$/,''))+'_'+fmtT(i*it.step).replace(/:/g,'-');
+      // ไม่เขียนทับ: ถ้ามีไฟล์ชื่อนี้แล้วจะใช้ชื่อ _2, _3 แทน
+      const fn=await uniqueName(dir,base,'.jpg','file');
       const fh=await dir.getFileHandle(fn,{create:true}),w=await fh.createWritable();
       await w.write(blob);await w.close();
     }
     csv+=[it.cat,it.name,fmtT(e.s*it.step),fmtT(e.e*it.step),e.ang?Math.round(e.ang):'A→B',p.t,VCODE[p.t]||'',p.f,p.n,p.v,folder].map(csvq).join(',')+'\n';
   }
-  const w=await(await root.getFileHandle('สรุป.csv',{create:true})).createWritable();
+  // สรุป.csv ก็ไม่เขียนทับ: ถ้ามีแล้วจะสร้าง สรุป_2.csv
+  const csvName=await uniqueName(root,'สรุป','.csv','file');
+  const w=await(await root.getFileHandle(csvName,{create:true})).createWritable();
   await w.write(csv);await w.close();
-  $('exs').textContent=`เสร็จแล้ว ${list.length} เหตุการณ์ → ${root.name}`;
+  $('exs').textContent=`เสร็จแล้ว ${list.length} เหตุการณ์ → ${root.name} (ไฟล์สรุป: ${csvName})`;
 };
 
 // ---------- เริ่มทำงาน ----------
