@@ -142,6 +142,7 @@ canvas{max-width:100%;display:block;background:#000;border-radius:8px}
         <label>เผื่อก่อน <input type="number" id="pre" value="2" min="0"> วิ</label>
         <label>เผื่อหลัง <input type="number" id="post" value="2" min="0"> วิ</label>
         <label><input type="checkbox" id="lvon"> แสดงภาพสดขณะรัน</label>
+        <label>ตอนไม่มีรถ กรอทุก <input type="number" id="idle" value="2" step="0.5" min="0.5"> วิ</label>
       </div>
     </div>
 
@@ -201,6 +202,8 @@ canvas{max-width:100%;display:block;background:#000;border-radius:8px}
         </div>
         <div class="row">
           <label><input type="checkbox" id="exall"> ส่งออกทุกภาพในช่วง</label>
+          <label><input type="checkbox" id="detail" checked> จับภาพละเอียดรอบเหตุการณ์</label>
+          <label>ทุก <input type="number" id="fine" value="0.25" step="0.05" min="0.1" style="width:64px"> วิ</label>
           <button id="exp" class="pri" disabled>ส่งออกที่ยืนยันแล้ว</button>
           <span id="exs" class="mu"></span>
         </div>
@@ -292,11 +295,17 @@ let RUN={total:0,doneN:0};
 let cats=JSON.parse(localStorage.uCats||'null')||['ทั่วไป'];
 let zonesAll=JSON.parse(localStorage.uZones||'{}');
 let REV={id:null,k:-1},fi=0,flat=[],showTok=0,plTok=0,lastType='',zk=null,zSample=null;
-const SET_IDS=['step','conf','mot','ang','pre','post','lvon','exall'];
+const SET_IDS=['step','conf','mot','ang','pre','post','lvon','exall','idle','detail','fine'];
 
 const ang=(a,b)=>Math.acos(Math.max(-1,Math.min(1,(a[0]*b[0]+a[1]*b[1])/((Math.hypot(...a)*Math.hypot(...b))||1))))*180/Math.PI;
 const poly=(c,z,w,h)=>{c.beginPath();z.forEach(([x,y],i)=>i?c.lineTo(x*w,y*h):c.moveTo(x*w,y*h));if(z.length>2)c.closePath()};
-const S=()=>({step:Math.max(0.2,+$('step').value||0.5),conf:+$('conf').value||0.35,mot:(+$('mot').value||4)/1000,ang:+$('ang').value||120,pre:+$('pre').value||0,post:+$('post').value||0,lost:8,minPts:3,hang:3,live:$('lvon').checked,all:$('exall').checked});
+const S=()=>{const step=Math.max(0.2,+$('step').value||0.5);return{
+  step,conf:+$('conf').value||0.35,mot:(+$('mot').value||4)/1000,ang:+$('ang').value||120,
+  pre:+$('pre').value||0,post:+$('post').value||0,lost:8,minPts:3,hang:3,
+  live:$('lvon').checked,all:$('exall').checked,
+  detail:$('detail').checked,fine:Math.max(0.1,+$('fine').value||0.25),
+  idleK:Math.max(1,Math.round((+$('idle').value||2)/step))
+}};
 
 // ---------- การจำค่า ----------
 function loadSet(){
@@ -682,10 +691,12 @@ async function processItem(it){
   it.step=o.step;it.dur=v.duration;
   const C={tracks:[],evs:[],thumbed:0,Z:zonesOf(it.cat),o,W:v.videoWidth,H:v.videoHeight};
   let prev=null,hang=0,det=0;const t0=performance.now();
-  for(let i=0;i<n&&!stopF;i++){
+  let i=0;
+  while(i<n&&!stopF){
     let bmp;
-    try{bmp=await getFrame(v,i*o.step)}catch(err){console.warn('frame',i,err);continue}
-    if(i%60===0)console.log('กำลังดู',it.name,'เฟรม',i,'/',n);
+    try{bmp=await getFrame(v,i*o.step)}
+    catch(err){console.warn('frame',i,err);i+=hang>0?1:o.idleK;continue}
+
     smx.drawImage(bmp,0,0,80,45);
     const d=smx.getImageData(0,0,80,45).data,g=new Uint8Array(3600);
     for(let k=0;k<3600;k++)g[k]=(d[k*4]+d[k*4+1]+d[k*4+2])/3;
@@ -693,19 +704,22 @@ async function processItem(it){
     if(prev){let c=0;for(let k=0;k<3600;k++)if(Math.abs(g[k]-prev[k])>20)c++;mv=c/3600}
     prev=g;
     if(mv>o.mot)hang=o.hang;
+
     let dets=[];
-if(hang>0){
-  hang--;det++;
-  try{
-    dets=await withTO(detect(bmp,o.conf),30000,'detect timeout');
-    update(C,i,dets,bmp);
-  }catch(err){console.warn('detect',i,err);dets=[]}
-}
+    if(hang>0){
+      hang--;det++;
+      try{dets=await withTO(detect(bmp,o.conf),15000,'detect timeout');update(C,i,dets,bmp)}
+      catch(err){console.warn('detect',i,err);dets=[]}
+    }
     if(o.live&&(dets.length||i%4===0))live(bmp,i,dets,C,it);
     closeStale(C,i,false);
     await thumbNew(C,v,it);
     bmp.close();
-    if(i%4===0||i===n-1){prog(it,i,n,t0,det,C.evs.length);await new Promise(r=>setTimeout(r,0))}
+
+    // มีรถ/มีการเคลื่อนไหว → ทีละเฟรม, ไม่มี → กรอตาม idleK
+    const stride=hang>0?1:o.idleK;
+    if(det%4===0||i+stride>=n){prog(it,Math.min(i,n-1),n,t0,det,C.evs.length);await new Promise(r=>setTimeout(r,0))}
+    i+=stride;
   }
   closeStale(C,0,true);
   await thumbNew(C,v,it);
@@ -1014,38 +1028,52 @@ $('exp').onclick=async()=>{
   if(!list.length)return;
   let root;try{root=await showDirectoryPicker({mode:'readwrite'})}catch(err){return}
   const o=S();
+  const tag=t=>fmtT(t).replace(/:/g,'-')+'.'+String(Math.round(t*100)%100).padStart(2,'0');
   let csv='\ufeffหมวด,ไฟล์วิดีโอ,จุดเริ่ม,จุดจบ,มุมกลับรถ,ประเภทรถ,รหัสประเภท,หมวดทะเบียน,เลข,จังหวัด,โฟลเดอร์\n';
   for(let n=0;n<list.length;n++){
     const [it,e]=list[n],p=e.plate;
     $('exs').textContent=`ส่งออก ${n+1}/${list.length}…`;
     const cdir=await root.getDirectoryHandle(safe(it.cat),{create:true});
     const plateTxt=[p.f&&p.n?p.f+p.n:(p.f||p.n),p.v].filter(Boolean).join('-');
-    // โฟลเดอร์เหตุการณ์: ถ้าชื่อซ้ำจะสร้างใหม่ต่อท้ายเป็น _2, _3 ไม่ไปรวมกับของเดิม
     const folderBase=`เหตุการณ์_${String(n+1).padStart(3,'0')}${plateTxt?'_'+safe(plateTxt):''}`;
     const folder=await uniqueName(cdir,folderBase,'','dir');
     const dir=await cdir.getDirectoryHandle(folder,{create:true});
-    const v=await ensureVid(it,'r'),last=Math.max(0,Math.floor(v.duration/it.step)-1);
-    const pre=Math.round(o.pre/it.step),post=Math.round(o.post/it.step);
-    const before=Math.max(0,e.s-pre),mid=Math.round((e.s+e.e)/2);
-    const idx=o.all
-      ? Array.from({length:Math.max(1,Math.min(last,e.e+post)-before+1)},(_,k)=>before+k)
-      : [...new Set([before,mid,e.e])];
-    for(const i of idx){
-      const bmp=await getFrame(v,i*it.step),c=document.createElement('canvas');
+    const v=await ensureVid(it,'r');
+    const last=Math.max(0,Math.floor(v.duration/it.step)-1);
+    const sT=e.s*it.step,eT=e.e*it.step;
+
+    // รายการภาพที่จะส่งออก: {t: วินาที, label: คำนำหน้าชื่อไฟล์}
+    let shots=[];
+    if(o.detail&&!o.all){
+      const a=Math.max(0,sT-o.pre),b=Math.min(v.duration-0.05,eT+o.post);
+      for(let t=a;t<=b+1e-6;t+=o.fine){
+        const tt=+t.toFixed(3);
+        shots.push({t:tt,label:tt<sT-1e-6?'1_ก่อนกระทำผิด_':tt<eT-1e-6?'2_ระหว่างกระทำผิด_':'3_ทะเบียน_'});
+      }
+      if(!shots.length)shots.push({t:eT,label:'3_ทะเบียน_'});
+    }else{
+      const pre=Math.round(o.pre/it.step),post=Math.round(o.post/it.step);
+      const before=Math.max(0,e.s-pre),mid=Math.round((e.s+e.e)/2);
+      const idx=o.all
+        ? Array.from({length:Math.max(1,Math.min(last,e.e+post)-before+1)},(_,k)=>before+k)
+        : [...new Set([before,mid,e.e])];
+      shots=idx.map(i=>({
+        t:i*it.step,
+        label:o.all?(i===e.e?'3_ทะเบียน_':''):(i===before?'1_ก่อนกระทำผิด_':i===e.e?'3_ทะเบียน_':i===mid?'2_ระหว่างกระทำผิด_':'')
+      }));
+    }
+
+    for(const {t,label} of shots){
+      const bmp=await getFrame(v,t),c=document.createElement('canvas');
       c.width=bmp.width;c.height=bmp.height;c.getContext('2d').drawImage(bmp,0,0);bmp.close();
-      const blob=await new Promise(r=>c.toBlob(r,'image/jpeg',0.93));
-      let label='';
-      if(!o.all)label=i===before?'1_ก่อนกระทำผิด_':i===e.e?'3_ทะเบียน_':i===mid?'2_ระหว่างกระทำผิด_':'';
-      else if(i===e.e)label='3_ทะเบียน_';
-      const base=label+safe(it.name.replace(/\.[^.]+$/,''))+'_'+fmtT(i*it.step).replace(/:/g,'-');
-      // ไม่เขียนทับ: ถ้ามีไฟล์ชื่อนี้แล้วจะใช้ชื่อ _2, _3 แทน
+      const blob=await new Promise(r=>c.toBlob(r,'image/jpeg',o.detail?0.96:0.93));
+      const base=label+safe(it.name.replace(/\.[^.]+$/,''))+'_'+tag(t);
       const fn=await uniqueName(dir,base,'.jpg','file');
       const fh=await dir.getFileHandle(fn,{create:true}),w=await fh.createWritable();
       await w.write(blob);await w.close();
     }
-    csv+=[it.cat,it.name,fmtT(e.s*it.step),fmtT(e.e*it.step),e.ang?Math.round(e.ang):'A→B',p.t,VCODE[p.t]||'',p.f,p.n,p.v,folder].map(csvq).join(',')+'\n';
+    csv+=[it.cat,it.name,fmtT(sT),fmtT(eT),e.ang?Math.round(e.ang):'A→B',p.t,VCODE[p.t]||'',p.f,p.n,p.v,folder].map(csvq).join(',')+'\n';
   }
-  // สรุป.csv ก็ไม่เขียนทับ: ถ้ามีแล้วจะสร้าง สรุป_2.csv
   const csvName=await uniqueName(root,'สรุป','.csv','file');
   const w=await(await root.getFileHandle(csvName,{create:true})).createWritable();
   await w.write(csv);await w.close();
