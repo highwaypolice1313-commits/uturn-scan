@@ -351,12 +351,20 @@ function codecMsg(err){return err&&err.code===4?'Chrome เปิดไฟล์
 function ensureVid(it,key){
   if(it[key])return Promise.resolve(it[key]);
   if(!it.url)it.url=URL.createObjectURL(it.file);
-  return new Promise((res,rej)=>{
+  const attempt=()=>new Promise((res,rej)=>{
     const v=document.createElement('video');v.muted=true;v.preload='auto';v.playsInline=true;
-    const to=setTimeout(()=>rej(new Error('เปิดวิดีโอค้าง (60 วิ) — ลองแปลงเป็น MP4 H.264')),60000);
-    v.onloadeddata=()=>{clearTimeout(to);it[key]=v;it.dur=it.dur||v.duration;res(v)};
-    v.onerror=()=>{clearTimeout(to);rej(new Error(codecMsg(v.error)))};
+    let done=false;
+    const fin=(ok,err)=>{if(done)return;done=true;clearTimeout(to);ok?res(v):rej(err)};
+    const to=setTimeout(()=>fin(false,new Error('เปิดวิดีโอค้าง (60 วิ)')),60000);
+    const good=()=>{it[key]=v;it.dur=it.dur||v.duration;fin(true)};
+    v.onloadeddata=good;
+    v.onloadedmetadata=()=>{if(v.readyState>=2)good()};
+    v.onerror=()=>fin(false,new Error(codecMsg(v.error)));
     v.src=it.url;
+  });
+  return attempt().catch(()=>{ // ลองใหม่หนึ่งครั้ง
+    releaseVid(it,key);
+    return attempt();
   });
 }
 function releaseVid(it,key){
