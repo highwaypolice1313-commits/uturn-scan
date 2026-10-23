@@ -1043,14 +1043,14 @@ $('exp').onclick=async()=>{
     const sT=e.s*it.step,eT=e.e*it.step;
 
     // รายการภาพที่จะส่งออก: {t: วินาที, label: คำนำหน้าชื่อไฟล์}
+    // โหมดละเอียด: ส่งออกทุกเฟรมตลอดช่วงกระทำผิด (รวมเผื่อก่อน/หลัง) ไม่มีป้ายแยก ไม่คัดเลือก
     let shots=[];
     if(o.detail&&!o.all){
       const a=Math.max(0,sT-o.pre),b=Math.min(v.duration-0.05,eT+o.post);
       for(let t=a;t<=b+1e-6;t+=o.fine){
-        const tt=+t.toFixed(3);
-        shots.push({t:tt,label:tt<sT-1e-6?'1_ก่อนกระทำผิด_':tt<eT-1e-6?'2_ระหว่างกระทำผิด_':'3_ทะเบียน_'});
+        shots.push({t:+t.toFixed(3),label:''});
       }
-      if(!shots.length)shots.push({t:eT,label:'3_ทะเบียน_'});
+      if(!shots.length)shots.push({t:eT,label:''});
     }else{
       const pre=Math.round(o.pre/it.step),post=Math.round(o.post/it.step);
       const before=Math.max(0,e.s-pre),mid=Math.round((e.s+e.e)/2);
@@ -1066,7 +1066,7 @@ $('exp').onclick=async()=>{
     for(const {t,label} of shots){
       const bmp=await getFrame(v,t),c=document.createElement('canvas');
       c.width=bmp.width;c.height=bmp.height;c.getContext('2d').drawImage(bmp,0,0);bmp.close();
-      const blob=await new Promise(r=>c.toBlob(r,'image/jpeg',o.detail?0.96:0.93));
+      const blob=await new Promise(r=>c.toBlob(r,'image/jpeg',o.detail?0.98:0.93));
       const base=label+safe(it.name.replace(/\.[^.]+$/,''))+'_'+tag(t);
       const fn=await uniqueName(dir,base,'.jpg','file');
       const fh=await dir.getFileHandle(fn,{create:true}),w=await fh.createWritable();
