@@ -1174,9 +1174,12 @@ $('exp').onclick=async()=>{
       const vn=await uniqueName(cdir,safe(it.name.replace(/\.[^.]+$/,'')),'','dir');
       vidDirs.set(it.id,await cdir.getDirectoryHandle(vn,{create:true}));
     }
-    const dir=vidDirs.get(it.id),folder=dir.name;
+    const vidDir=vidDirs.get(it.id);
     const plateTxt=[p.f&&p.n?p.f+p.n:(p.f||p.n),p.v].filter(Boolean).join('-');
     const evLabel=`เหตุการณ์${String(n+1).padStart(3,'0')}${plateTxt?'_'+safe(plateTxt):''}`;
+    // โฟลเดอร์ย่อยต่อเหตุการณ์ ชื่อเดียวกับ evLabel (ถ้าซ้ำจะลงท้าย _2)
+    const dir=await vidDir.getDirectoryHandle(await uniqueName(vidDir,evLabel,'','dir'),{create:true});
+    const folder=`${vidDir.name}/${dir.name}`;
     const sT=evS(it,e),eT=evE(it,e);
 
     for(const {t,label} of shots){
