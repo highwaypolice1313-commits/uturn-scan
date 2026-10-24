@@ -1050,7 +1050,6 @@ const expUI={
   done(msg){this.set(1,msg);$('expClose').hidden=false},
   close(){$('expModal').hidden=true}
 };
-$('expClose').onclick=()=>expUI.close();  
 
 // ---------- ส่งออก ----------
 $('exp').onclick=async()=>{
@@ -1124,6 +1123,7 @@ $('provs').innerHTML=PROV.map(p=>`<option value="${p}">`).join('');
 $('pty').innerHTML='<option value="">ประเภทรถ...</option>'+VTYPES.map(t=>`<option value="${esc(t)}">${esc(t)}${VCODE[t]?' ('+VCODE[t]+')':''}</option>`).join('');
 loadSet();
 refreshLiveBox();
+$('expClose').onclick=()=>expUI.close();  
 renderAll();
 fetch('yolov8n.onnx').then(r=>r.ok?r.arrayBuffer():Promise.reject()).then(loadModel)
   .catch(()=>pill('เลือกไฟล์โมเดล yolov8n.onnx (ถ้าเปิดไฟล์โดยตรงจะโหลดให้อัตโนมัติไม่ได้)',false));
