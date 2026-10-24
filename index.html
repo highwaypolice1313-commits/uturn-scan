@@ -20,10 +20,13 @@ header h1{font-size:18px;margin:0;flex:1 1 auto}
 .layout{display:grid;grid-template-columns:240px minmax(0,1fr);min-height:calc(100vh - 62px)}
 aside{border-right:1px solid var(--bd);background:var(--sf);padding:14px;display:flex;flex-direction:column;gap:6px}
 aside h3{font-size:12px;color:var(--mu);margin:6px 0 4px;font-weight:600}
-.cat{display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border-radius:8px;cursor:pointer;border:1px solid transparent}
+.cat{position:relative;display:flex;justify-content:space-between;align-items:center;gap:6px;padding:8px 10px;border-radius:8px;cursor:pointer;border:1px solid transparent}
 .cat:hover{background:var(--sf2)}
 .cat.on{background:var(--sf2);border-color:var(--ac)}
 .cat small{color:var(--mu)}
+.cat .cact{display:none;gap:4px}
+.cat:hover .cact{display:flex}
+.cat .cact button{padding:2px 6px;font-size:12px}
 main{padding:18px 22px;min-width:0}
 .tabs{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}
 .tab.on{background:var(--ac);color:#111;border-color:var(--ac);font-weight:600}
@@ -80,16 +83,14 @@ canvas{max-width:100%;display:block;background:#000;border-radius:8px}
 }
 .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:50}
 .modal-bg[hidden]{display:none}
-.modal{background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);padding:22px 24px;width:min(420px,90vw)}
+.modal{background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);padding:22px 24px;width:min(440px,90vw)}
 .modal h2{font-size:16px;margin:0 0 6px}
 .modal .bar.big{margin:14px 0 8px}
 .modal .pct{font-size:28px;font-weight:600;color:var(--ac);text-align:center;margin:4px 0}
-.modal .det{font-size:13px;color:var(--mu);min-height:18px;word-break:break-all}
-.modal .btns{display:flex;justify-content:flex-end;margin-top:14px}
-.cat{position:relative}
-.cat .cact{display:none;gap:4px;margin-left:6px}
-.cat:hover .cact{display:flex}
-.cat .cact button{padding:2px 6px;font-size:12px}  
+.modal .det{font-size:13px;color:var(--mu);min-height:18px;word-break:break-all;white-space:pre-line}
+.modal .btns{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
+.dlgtxt{white-space:pre-line;color:var(--tx);margin:6px 0 0;font-size:14px}
+#dlgI{width:100%;margin-top:12px}
 </style>
 </head>
 <body>
@@ -117,7 +118,7 @@ canvas{max-width:100%;display:block;background:#000;border-radius:8px}
     <input id="newCat" placeholder="ชื่อหมวดใหม่" style="flex:1">
     <button id="addCat">เพิ่ม</button>
   </div>
-  <div class="mu" style="margin-top:14px">คลิกหมวดเพื่อกรองคิวและผลลัพธ์ วิดีโอใหม่จะเข้าหมวดที่เลือกอยู่ โซนกลับรถแยกตามหมวด และหมวดที่ยังไม่มีโซนจะใช้โซนกลาง</div>
+  <div class="mu" style="margin-top:14px">คลิกหมวดเพื่อกรองคิวและผลลัพธ์ วิดีโอใหม่จะเข้าหมวดที่เลือกอยู่ โซนกลับรถแยกตามหมวด และหมวดที่ยังไม่มีโซนจะใช้โซนกลาง · เอาเมาส์ชี้หมวดเพื่อแก้ชื่อหรือลบ</div>
 </aside>
 
 <main>
@@ -148,14 +149,14 @@ canvas{max-width:100%;display:block;background:#000;border-radius:8px}
     <div class="card">
       <h2>ตั้งค่าการตรวจ <span class="mu">(ระบบจำค่าไว้ให้อัตโนมัติ)</span></h2>
       <div class="row">
-        <label>ตรวจทุก <input type="number" id="step" value="0.5" step="0.1" min="0.2"> วินาที</label>
+        <label>ตรวจหยาบ (หาว่ามีรถ) ทุก <input type="number" id="idle" value="1" step="0.5" min="0.5"> วิ</label>
+        <label>ตรวจละเอียด (เฉพาะช่วงที่มีรถ) ทุก <input type="number" id="step" value="0.2" step="0.1" min="0.1"> วิ</label>
         <label>ความมั่นใจ <input type="number" id="conf" value="0.35" step="0.05" min="0.1" max="0.9"></label>
         <label>ความไวตัดเฟรมว่าง <input type="number" id="mot" value="4" min="1"></label>
         <label>มุมกลับรถ ≥ <input type="number" id="ang" value="120" min="60" max="180">°</label>
         <label>เผื่อก่อน <input type="number" id="pre" value="2" min="0"> วิ</label>
         <label>เผื่อหลัง <input type="number" id="post" value="2" min="0"> วิ</label>
         <label><input type="checkbox" id="lvon"> แสดงภาพสดขณะรัน</label>
-        <label>ตอนไม่มีรถ กรอทุก <input type="number" id="idle" value="2" step="0.5" min="0.5"> วิ</label>
       </div>
     </div>
 
@@ -236,6 +237,8 @@ canvas{max-width:100%;display:block;background:#000;border-radius:8px}
             <button id="bn" class="dng">ไม่ใช่ (N)</button>
             <button id="bs">ตั้งจุดเริ่ม [</button>
             <button id="be">ตั้งจุดจบ ]</button>
+            <button id="undo">↶ ย้อน (Ctrl+Z)</button>
+            <button id="expOne">ส่งออกเหตุการณ์นี้</button>
           </div>
           <div class="mu" style="margin-top:8px">← → ทีละเฟรม · Shift+← → ทีละ ~1 วิ · ↑ ↓ เปลี่ยนเหตุการณ์ · Y/N ยืนยันแล้วไปรายการถัดไปอัตโนมัติ</div>
         </div>
@@ -285,7 +288,7 @@ canvas{max-width:100%;display:block;background:#000;border-radius:8px}
 </main>
 </div>
 
-<!-- ===== Modal ความคืบหน้าการส่งออก (ต้องอยู่ก่อน <script>) ===== -->
+<!-- ===== Modal ความคืบหน้าการส่งออก ===== -->
 <div id="expModal" class="modal-bg" hidden>
   <div class="modal">
     <h2>กำลังส่งออกภาพ</h2>
@@ -296,6 +299,16 @@ canvas{max-width:100%;display:block;background:#000;border-radius:8px}
   </div>
 </div>
 
+<!-- ===== Modal แจ้งเตือนทั้งหมดของระบบ ===== -->
+<div id="dlg" class="modal-bg" hidden>
+  <div class="modal">
+    <h2 id="dlgT"></h2>
+    <div id="dlgB" class="dlgtxt"></div>
+    <input id="dlgI" hidden>
+    <div class="btns" id="dlgBtns"></div>
+  </div>
+</div>
+
 <script>
 const $=id=>document.getElementById(id);
 const pad=x=>String(x).padStart(2,'0');
@@ -303,6 +316,7 @@ const fmtT=s=>{s=Math.max(0,s);return pad(Math.floor(s/3600))+':'+pad(Math.floor
 const fmtMS=s=>{s=Math.max(0,s);const ms=Math.round(s*1000);
   return pad(Math.floor(ms/3600000))+':'+pad(Math.floor(ms%3600000/60000))+':'+pad(Math.floor(ms%60000/1000))+'.'+String(ms%1000).padStart(3,'0')};
 const fmtSec=s=>s<60?Math.round(s)+' วิ':Math.floor(s/60)+' นาที '+Math.round(s%60)+' วิ';
+const fmtBytes=b=>b>=1e9?(b/1e9).toFixed(2)+' GB':(b/1e6).toFixed(0)+' MB';
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const safe=s=>String(s).replace(/[\\/:*?"<>|\r\n\t]/g,'_').trim().slice(0,80)||'x';
 const csvq=s=>'"'+String(s??'').replace(/"/g,'""')+'"';
@@ -310,10 +324,37 @@ const ZC={a:'245,165,36',b:'74,163,255'};
 const BADGE={wait:'รอคิว',run:'กำลังทำ',done:'เสร็จ',err:'ผิดพลาด'};
 const withTO=(p,ms,msg)=>Promise.race([p,new Promise((_,j)=>setTimeout(()=>j(new Error(msg)),ms))]);
 
-// ระยะเลื่อนละเอียด = 1 เฟรม (~25fps) และเวลาเริ่ม/จบของเหตุการณ์ (วินาที)
-const RS=0.04;
-const evS=(it,e)=>e.ts!=null?e.ts:e.s*it.step;
-const evE=(it,e)=>e.te!=null?e.te:e.e*it.step;
+const RS=0.04;          // ความละเอียดสูงสุด = 1 เฟรม (~25fps)
+const LOST=4;           // วินาทีที่หายจากเฟรมแล้วถือว่าการเคลื่อนที่จบ
+const MINPTS=3;         // จำนวนจุดขั้นต่ำของการติดตามหนึ่งรายการ
+const evS=(it,e)=>e.ts;
+const evE=(it,e)=>e.te;
+const nearPt=(pts,t)=>{let q=pts[0];for(const p of pts)if(Math.abs(p.t-t)<Math.abs(q.t-t))q=p;return q};
+
+// ---------- Modal แจ้งเตือนแทน alert / confirm / prompt ----------
+function dlg(text,{title='แจ้งเตือน',input,ok='ตกลง',cancel=null}={}){
+  return new Promise(res=>{
+    const box=$('dlg'),inp=$('dlgI');
+    $('dlgT').textContent=title;$('dlgB').textContent=text;
+    inp.hidden=input===undefined;if(!inp.hidden)inp.value=input;
+    const btns=$('dlgBtns');btns.innerHTML='';
+    const val=()=>inp.hidden?true:inp.value;
+    const done=v=>{box.hidden=true;document.removeEventListener('keydown',kd,true);res(v)};
+    const kd=e=>{
+      e.stopPropagation();
+      if(e.key==='Escape'&&cancel!==null){e.preventDefault();done(false)}
+      else if(e.key==='Enter'&&e.target.tagName!=='BUTTON'){e.preventDefault();done(val())}
+    };
+    const b1=document.createElement('button');b1.textContent=ok;b1.className='pri';b1.onclick=()=>done(val());btns.appendChild(b1);
+    if(cancel!==null){const b2=document.createElement('button');b2.textContent=cancel;b2.onclick=()=>done(false);btns.appendChild(b2)}
+    box.hidden=false;
+    document.addEventListener('keydown',kd,true);
+    (inp.hidden?b1:inp).focus();
+  });
+}
+const msg=(text,title='แจ้งเตือน')=>dlg(text,{title});
+const confirmD=(text,title='ยืนยัน')=>dlg(text,{title,ok:'ยืนยัน',cancel:'ยกเลิก'});
+const promptD=(text,value,title='กรอกข้อมูล')=>dlg(text,{title,input:value,ok:'บันทึก',cancel:'ยกเลิก'});
 
 // ตารางรหัสประเภทรถ (ตรวจกับตารางทางการของกรมการขนส่งทางบกก่อนใช้จริง)
 const VCODE={'รถเก๋ง/รถนั่ง':'01','แท็กซี่':'07','รถกระบะ':'03','รถบรรทุกส่วนบุคคล':'35'};
@@ -327,20 +368,27 @@ let RUN={total:0,doneN:0};
 let cats=JSON.parse(localStorage.uCats||'null')||['ทั่วไป'];
 let zonesAll=JSON.parse(localStorage.uZones||'{}');
 let REV={id:null,k:-1},fi=0,flat=[],showTok=0,plTok=0,lastType='',zk=null,zSample=null;
+const hist=[];   // ประวัติ Y/N สำหรับปุ่มย้อนกลับ
 const SET_IDS=['step','conf','mot','ang','pre','post','lvon','exall','idle','detail','fine'];
 
 const ang=(a,b)=>Math.acos(Math.max(-1,Math.min(1,(a[0]*b[0]+a[1]*b[1])/((Math.hypot(...a)*Math.hypot(...b))||1))))*180/Math.PI;
 const poly=(c,z,w,h)=>{c.beginPath();z.forEach(([x,y],i)=>i?c.lineTo(x*w,y*h):c.moveTo(x*w,y*h));if(z.length>2)c.closePath()};
-const S=()=>{const step=Math.max(0.2,+$('step').value||0.5);return{
-  step,conf:+$('conf').value||0.35,mot:(+$('mot').value||4)/1000,ang:+$('ang').value||120,
-  pre:+$('pre').value||0,post:+$('post').value||0,
-  lost:Math.max(2,Math.round(4/step)),   // หายจากเฟรมนานกว่า ~4 วิ ถึงจะตัดว่าจบ
-  minPts:3,
-  hang:Math.max(1,Math.round(2/step)),   // หลังเห็นการเคลื่อนไหว ตรวจต่อ ~2 วิ
-  live:$('lvon').checked,all:$('exall').checked,
-  detail:$('detail').checked,fine:Math.max(1,Math.round((+$('fine').value||0.04)/RS))*RS,
-  idleK:Math.max(1,Math.round((+$('idle').value||2)/step))
-}};
+
+// ค่าตั้งค่า ณ ตอนเริ่มทำงาน
+const S=()=>{
+  const step=Math.max(0.1,+$('step').value||0.2);
+  return{
+    step,                                       // ตรวจละเอียด (เฉพาะช่วงที่มีรถ)
+    coarse:Math.max(0.5,+$('idle').value||1),   // ตรวจหยาบ (หาว่ามีรถเมื่อไหร่)
+    conf:+$('conf').value||0.35,
+    mot:(+$('mot').value||4)/1000,
+    ang:+$('ang').value||120,
+    pre:+$('pre').value||0,post:+$('post').value||0,
+    live:$('lvon').checked,all:$('exall').checked,
+    detail:$('detail').checked,
+    fine:Math.max(1,Math.round((+$('fine').value||0.04)/RS))*RS
+  };
+};
 
 // ---------- การจำค่า ----------
 function loadSet(){
@@ -354,7 +402,8 @@ function saveSet(){
 SET_IDS.forEach(id=>$(id).addEventListener('change',saveSet));
 
 // canvas ทำงานเบื้องหลัง
-const cvs=document.createElement('canvas');cvs.width=cvs.height=640;const dctx=cvs.getContext('2d',{willReadFrequently:true});
+const dctx=document.createElement('canvas').getContext('2d',{willReadFrequently:true});
+dctx.canvas.width=dctx.canvas.height=640;
 const sm=document.createElement('canvas');sm.width=80;sm.height=45;const smx=sm.getContext('2d',{willReadFrequently:true});
 const sc2=document.createElement('canvas'),shx=sc2.getContext('2d',{willReadFrequently:true});
 const vc=$('vc'),vx=vc.getContext('2d'),zc=$('zc'),lv=$('lv'),lctx=lv.getContext('2d');
@@ -505,30 +554,30 @@ function sharp(bmp,b){
   return n?s2/n-(s/n)**2:0;
 }
 
-// ---------- ติดตาม & ตัดสินกลับรถ ----------
-const mk=(bmp,i,d)=>({i,b:d,cx:(d.x1+d.x2)/2,cy:(d.y1+d.y2)/2,s:sharp(bmp,d)*(d.x2-d.x1)});
-function update(C,i,dets,bmp){
+// ---------- ติดตาม & ตัดสินกลับรถ (ใช้เวลาเป็นวินาทีทั้งหมด) ----------
+const mk=(bmp,t,d)=>({t,b:d,cx:(d.x1+d.x2)/2,cy:(d.y1+d.y2)/2,s:sharp(bmp,d)*(d.x2-d.x1)});
+function update(C,t,dets,bmp){
   const used=new Set();
-  for(const t of C.tracks){if(t.done)continue;const l=t.pts[t.pts.length-1];
+  for(const tr of C.tracks){if(tr.done)continue;const l=tr.pts[tr.pts.length-1];
     let bj=-1,bd=0.9*Math.max(l.b.x2-l.b.x1,l.b.y2-l.b.y1);
     dets.forEach((d,j)=>{if(used.has(j))return;const dd=Math.hypot((d.x1+d.x2-l.b.x1-l.b.x2)/2,(d.y1+d.y2-l.b.y1-l.b.y2)/2);if(dd<bd){bd=dd;bj=j}});
-    if(bj>=0){used.add(bj);t.pts.push(mk(bmp,i,dets[bj]))}
+    if(bj>=0){used.add(bj);tr.pts.push(mk(bmp,t,dets[bj]))}
   }
-  dets.forEach((d,j)=>{if(!used.has(j))C.tracks.push({done:false,pts:[mk(bmp,i,d)]})});
+  dets.forEach((d,j)=>{if(!used.has(j))C.tracks.push({done:false,pts:[mk(bmp,t,d)]})});
 }
-function closeStale(C,i,force){
-  for(const t of C.tracks)if(!t.done&&(force||i-t.pts[t.pts.length-1].i>C.o.lost)){t.done=true;evalTrack(C,t)}
-  C.tracks=C.tracks.filter(t=>!t.done);
+function closeStale(C,now,force){
+  for(const tr of C.tracks)if(!tr.done&&(force||now-tr.pts[tr.pts.length-1].t>LOST)){tr.done=true;evalTrack(C,tr)}
+  C.tracks=C.tracks.filter(tr=>!tr.done);
 }
-function evalTrack(C,t){
-  const p=t.pts,{Z,W,H}=C;if(p.length<C.o.minPts)return;
+function evalTrack(C,tr){
+  const p=tr.pts,{Z,W,H}=C;if(p.length<MINPTS)return;
   const AB=Z.a&&Z.a.length>2&&Z.b&&Z.b.length>2;
   if(AB){
     const ia=p.findIndex(q=>inZ(q,Z.a,W,H));if(ia<0)return;
     let ib=-1;for(let j=ia+1;j<p.length;j++)if(inZ(p[j],Z.b,W,H)){ib=j;break}
     if(ib<0)return;
     let bi=ib;for(let j=ib;j<p.length;j++)if(p[j].s>p[bi].s)bi=j;
-    C.evs.push({s:p[ia].i,e:p[bi].i,t:p,ang:0});return;
+    C.evs.push({ts:p[ia].t,te:p[bi].t,pts:p,ang:0});return;
   }
   const k=Math.max(2,Math.floor(p.length/4)),n=p.length-1;
   const v1=[p[k].cx-p[0].cx,p[k].cy-p[0].cy],v2=[p[n].cx-p[n-k].cx,p[n].cy-p[n-k].cy];
@@ -539,7 +588,7 @@ function evalTrack(C,t){
   let s=0;
   for(let j=3;j<p.length;j++){const v=[p[j].cx-p[j-3].cx,p[j].cy-p[j-3].cy];if(Math.hypot(...v)>=2&&ang(v,v1)>35){s=j-3;break}}
   let bi=s;for(let j=s;j<p.length;j++)if(p[j].s>p[bi].s)bi=j;
-  C.evs.push({s:p[s].i,e:Math.max(p[bi].i,p[s].i),t:p,ang:a});
+  C.evs.push({ts:p[s].t,te:Math.max(p[bi].t,p[s].t),pts:p,ang:a});
 }
 
 // ---------- ภาพสด & ภาพที่ตรวจเจอ ----------
@@ -548,17 +597,16 @@ function refreshLiveBox(){
   $('lvwrap').hidden=!on;
   $('livebox').hidden=!(on||$('evth').children.length);
 }
-function live(bmp,i,dets,C,it){
-  if(!$('lvon').checked)return;
+function live(bmp,t,dets,C,it){
   if(lv.width!==bmp.width||lv.height!==bmp.height){lv.width=bmp.width;lv.height=bmp.height}
   const w=bmp.width,h=bmp.height;
   lctx.drawImage(bmp,0,0);lctx.lineWidth=Math.max(2,w/400);
   for(const k of['a','b']){const z=C.Z[k];if(z&&z.length>2){poly(lctx,z,w,h);lctx.strokeStyle=`rgba(${ZC[k]},.8)`;lctx.setLineDash([8,6]);lctx.stroke();lctx.setLineDash([])}}
   lctx.strokeStyle='#3fb950';
-  for(const t of C.tracks){lctx.beginPath();t.pts.forEach((p,k)=>k?lctx.lineTo(p.cx,p.cy):lctx.moveTo(p.cx,p.cy));lctx.stroke()}
+  for(const tr of C.tracks){lctx.beginPath();tr.pts.forEach((p,k)=>k?lctx.lineTo(p.cx,p.cy):lctx.moveTo(p.cx,p.cy));lctx.stroke()}
   lctx.strokeStyle='#f5a524';lctx.lineWidth=Math.max(3,w/250);
   for(const d of dets)lctx.strokeRect(d.x1,d.y1,d.x2-d.x1,d.y2-d.y1);
-  $('lvt').textContent=`${it.name} · ${fmtT(i*C.o.step)} · ตรวจพบรถ ${dets.length} คัน · พบ ${C.evs.length} เหตุการณ์`;
+  $('lvt').textContent=`${it.name} · ${fmtT(t)} · ตรวจพบรถ ${dets.length} คัน · พบ ${C.evs.length} เหตุการณ์`;
 }
 function thumb(bmp,box){
   const c=document.createElement('canvas'),s=180/bmp.width;
@@ -569,7 +617,7 @@ function thumb(bmp,box){
 }
 function addThumbCard(it,e){
   const d=document.createElement('div');d.className='th';
-  d.innerHTML=`<img src="${e.thumb}" alt=""><div>${esc(it.name)}</div><div>${fmtT(e.e*it.step)}${e.ang?' · '+Math.round(e.ang)+'°':' · A→B'}</div>`;
+  d.innerHTML=`<img src="${e.thumb}" alt=""><div>${esc(it.name)}</div><div>${fmtT(e.te)}${e.ang?' · '+Math.round(e.ang)+'°':' · A→B'}</div>`;
   $('evth').prepend(d);
   refreshLiveBox();
 }
@@ -577,20 +625,19 @@ async function thumbNew(C,v,it){
   while(C.thumbed<C.evs.length){
     const e=C.evs[C.thumbed++];
     try{
-      const bmp=await getFrame(v,e.e*C.o.step);
-      const q=e.t.find(p=>p.i===e.e)||e.t[e.t.length-1];
+      const bmp=await getFrame(v,e.te);
+      const q=nearPt(e.pts,e.te);
       e.thumb=thumb(bmp,q.b);bmp.close();
       addThumbCard(it,e);
     }catch(err){console.warn('thumb',err)}
   }
 }
-function prog(it,i,n,t0,det,evn){
-  const pct=(i+1)/n*100;it.pct=pct;
-  const sec=(performance.now()-t0)/1000,eta=sec/(i+1)*(n-i-1);
+function prog(it,pct,info){
+  it.pct=pct;
   const el=$('r'+it.id);
-  if(el){el.querySelector('.bar i').style.width=pct+'%';el.querySelector('[data-info]').textContent=`${pct.toFixed(1)}% · ตรวจรถ ${det} เฟรม · พบ ${evn} เหตุการณ์ · เหลือ ~${fmtSec(eta)}`}
+  if(el){el.querySelector('.bar i').style.width=pct+'%';el.querySelector('[data-info]').textContent=info}
   $('ovBar').style.width=((RUN.doneN+pct/100)/Math.max(1,RUN.total)*100)+'%';
-  $('ovT').textContent=`ไฟล์ ${RUN.doneN+1}/${RUN.total} · ${it.name} · ผ่านไป ${fmtSec(sec)}`;
+  $('ovT').textContent=`ไฟล์ ${RUN.doneN+1}/${RUN.total} · ${it.name}`;
 }
 
 // ---------- OCR & จำแนกประเภท (ทำในแท็บ 4 เท่านั้น) ----------
@@ -640,8 +687,8 @@ async function classifyVehicle(src){
 // อ่านทะเบียนของเหตุการณ์หนึ่ง เติมค่าให้ e.auto และ e.plate (ถ้ายังว่าง)
 async function ocrOne(it,e){
   const v=await ensureVid(it,'r');
-  const q=e.t.find(p=>p.i===e.e)||e.t[e.t.length-1];
-  const bmp=await getFrame(v,evE(it,e));
+  const q=nearPt(e.pts,e.te);
+  const bmp=await getFrame(v,e.te);
   try{
     const pc=cropBox(bmp,plateBox(q.b));
     e.plateImg=pc.toDataURL('image/jpeg',0.85);
@@ -695,7 +742,7 @@ async function ocrRunOne(it,k){
   }catch(err){e.ocrState='err';e.ocrErr=err.message||String(err)}
 }
 async function runOcrAll(){
-  if(running)return alert('กำลังตรวจวิดีโออยู่ — รอให้เสร็จหรือกดหยุดก่อน');
+  if(running)return msg('กำลังตรวจวิดีโออยู่ — รอให้เสร็จหรือกดหยุดก่อน');
   if(ocrBusy)return;
   const list=ocrTargets();
   if(!list.length)return;
@@ -727,67 +774,114 @@ $('ocList').addEventListener('click',async e=>{
   ocrBusy=false;renderOcr();
 });
 
-// ---------- ประมวลผลวิดีโอหนึ่งไฟล์ (พัก/ทำต่อได้) ----------
+// ---------- ประมวลผลวิดีโอ 2 รอบ: หยาบหาช่วงที่มีรถ → ละเอียดเฉพาะช่วงนั้น ----------
+const newRun=()=>({phase:1,t:0,prev:null,hits:[],windows:[],wi:0,wt:null,det:0,elapsed:0,C:null});
+
+// รวมจุดที่พบรถเป็นช่วง (เผื่อก่อนหลัง และรวมช่วงที่ติดกัน)
+function buildWindows(hits,coarse,dur){
+  const pad=Math.max(3,coarse*2),out=[];
+  for(const t of hits){
+    const a=Math.max(0,t-pad),b=Math.min(dur-0.05,t+pad);
+    const last=out[out.length-1];
+    if(last&&a<=last.b+1)last.b=Math.max(last.b,b);
+    else out.push({a,b});
+  }
+  return out;
+}
+function pauseItem(it,R,t0){
+  R.elapsed=(performance.now()-t0)/1000;
+  if(hardStop){it.resume=null;it.events=[]}
+  else it.resume=R;
+  releaseVid(it,'p');
+  return 'paused';
+}
 async function processItem(it){
   items.forEach(x=>{if(x!==it){releaseVid(x,'p');releaseVid(x,'r')}});
   const v=await ensureVid(it,'p');
-  const R=it.resume||{C:null,i:0,prev:null,hang:0,det:0,elapsed:0};
-  if(!R.C){
-    const o0=S();
-    R.C={tracks:[],evs:[],thumbed:0,Z:zonesOf(it.cat),o:o0,W:v.videoWidth,H:v.videoHeight};
-  }
-  const C=R.C,o=C.o,n=Math.max(1,Math.floor(v.duration/o.step));
-  it.step=o.step;it.dur=v.duration;
-  let i=R.i,prev=R.prev,hang=R.hang,det=R.det;
+  const dur=v.duration;
+  const R=it.resume||newRun();
+  it.resume=R;
+  if(!R.C)R.C={o:S(),W:v.videoWidth,H:v.videoHeight,Z:zonesOf(it.cat),tracks:[],evs:[],thumbed:0};
+  const C=R.C,o=C.o;
+  it.step=o.step;it.dur=dur;
   const t0=performance.now()-R.elapsed*1000;
 
-  while(i<n&&!stopF){
-    let bmp;
-    try{bmp=await getFrame(v,i*o.step)}
-    catch(err){console.warn('frame',i,err);i+=hang>0?1:o.idleK;continue}
-
-    smx.drawImage(bmp,0,0,80,45);
-    const d=smx.getImageData(0,0,80,45).data,g=new Uint8Array(3600);
-    for(let k=0;k<3600;k++)g[k]=(d[k*4]+d[k*4+1]+d[k*4+2])/3;
-    let mv=0;
-    if(prev){let c=0;for(let k=0;k<3600;k++)if(Math.abs(g[k]-prev[k])>20)c++;mv=c/3600}
-    prev=g;
-    if(mv>o.mot)hang=o.hang;
-
-    let dets=[];
-    if(hang>0){
-      hang--;det++;
-      try{dets=await withTO(detect(bmp,o.conf),15000,'detect timeout');update(C,i,dets,bmp)}
-      catch(err){console.warn('detect',i,err);dets=[]}
-    }
-    if(o.live&&(dets.length||i%4===0))live(bmp,i,dets,C,it);
-    closeStale(C,i,false);
-    await thumbNew(C,v,it);
-    bmp.close();
-
-    const stride=hang>0?1:o.idleK;
-    if(det%4===0||i+stride>=n){prog(it,Math.min(i,n-1),n,t0,det,C.evs.length);await new Promise(r=>setTimeout(r,0))}
-    i+=stride;
-  }
-
-  // หยุดกลางคัน: พักไว้ หรือล้างเพื่อเริ่มใหม่
-  if(i<n){
-    if(hardStop){
-      it.resume=null;it.events=[];
+  const report=()=>{
+    const sec=fmtSec((performance.now()-t0)/1000);
+    if(R.phase===1){
+      const pct=R.t/dur*50;
+      prog(it,Math.min(50,pct),`${pct.toFixed(1)}% · ตรวจหยาบ · พบการเคลื่อนไหว ${R.hits.length} จุด · ${sec}`);
     }else{
-      it.resume={C,i,prev,hang,det,elapsed:(performance.now()-t0)/1000};
-      it.pct=i/n*100;
+      const tot=R.windows.reduce((a,w)=>a+(w.b-w.a),0)||1;
+      let done=0;
+      for(let k=0;k<R.wi&&k<R.windows.length;k++)done+=R.windows[k].b-R.windows[k].a;
+      const cw=R.windows[R.wi];
+      if(cw&&R.wt!=null)done+=Math.min(R.wt,cw.b)-cw.a;
+      const pct=50+Math.min(1,done/tot)*50;
+      prog(it,Math.min(100,pct),`${pct.toFixed(1)}% · ตรวจละเอียด · ตรวจ ${R.det} เฟรม · พบ ${C.evs.length} เหตุการณ์ · ${sec}`);
     }
-    releaseVid(it,'p');
-    return 'paused';
+  };
+
+  // ---- รอบที่ 1: ตรวจหยาบ หาว่ามีรถตรงเวลาไหน ----
+  if(R.phase===1){
+    while(R.t<dur&&!stopF){
+      let bmp=null;
+      try{bmp=await getFrame(v,R.t)}
+      catch(err){console.warn('frame',R.t,err);R.t+=o.coarse;continue}
+      smx.drawImage(bmp,0,0,80,45);
+      const d=smx.getImageData(0,0,80,45).data,g=new Uint8Array(3600);
+      for(let k=0;k<3600;k++)g[k]=(d[k*4]+d[k*4+1]+d[k*4+2])/3;
+      let mv=0;
+      if(R.prev){let c=0;for(let k=0;k<3600;k++)if(Math.abs(g[k]-R.prev[k])>20)c++;mv=c/3600}
+      R.prev=g;
+      if(mv>o.mot){
+        R.det++;
+        try{const dets=await withTO(detect(bmp,o.conf),15000,'detect timeout');if(dets.length)R.hits.push(R.t)}
+        catch(err){console.warn('detect',R.t,err)}
+      }
+      bmp.close();
+      R.t+=o.coarse;
+      report();
+      await new Promise(r=>setTimeout(r,0));
+    }
+    if(stopF&&R.t<dur)return pauseItem(it,R,t0);
+    R.windows=buildWindows(R.hits,o.coarse,dur);
+    R.phase=2;R.wi=0;R.wt=null;R.det=0;
   }
 
-  // ทำจนจบ
+  // ---- รอบที่ 2: ตรวจละเอียดเฉพาะช่วงที่พบรถ ----
+  if(R.phase===2){
+    while(R.wi<R.windows.length){
+      const w=R.windows[R.wi];
+      if(R.wt==null)R.wt=w.a;
+      while(R.wt<=w.b&&!stopF){
+        let bmp=null;
+        try{bmp=await getFrame(v,R.wt)}
+        catch(err){console.warn('frame',R.wt,err);R.wt+=o.step;continue}
+        let dets=[];
+        try{dets=await withTO(detect(bmp,o.conf),15000,'detect timeout');update(C,R.wt,dets,bmp)}
+        catch(err){console.warn('detect',R.wt,err)}
+        R.det++;
+        if(o.live)live(bmp,R.wt,dets,C,it);
+        closeStale(C,R.wt,false);
+        await thumbNew(C,v,it);
+        bmp.close();
+        R.wt+=o.step;
+        report();
+        await new Promise(r=>setTimeout(r,0));
+      }
+      if(R.wt<=w.b)return pauseItem(it,R,t0); // หยุดกลางช่วง
+      closeStale(C,0,true);
+      R.wi++;R.wt=null;
+    }
+  }
+
+  // ---- ทำจนจบ ----
   closeStale(C,0,true);
   await thumbNew(C,v,it);
-  it.events=C.evs.sort((a,b)=>a.s-b.s).map(e=>({...e,ok:null,plate:{t:'',f:'',n:'',v:''},auto:null,plateImg:null,ocrState:null,ocrErr:''}));
+  it.events=C.evs.sort((a,b)=>a.ts-b.ts).map(e=>({...e,ok:null,plate:{t:'',f:'',n:'',v:''},auto:null,plateImg:null,ocrState:null,ocrErr:''}));
   it.resume=null;
-  console.log('เสร็จลูปเฟรม',it.name,'พบ',it.events.length,'เหตุการณ์');
+  console.log('เสร็จ',it.name,'พบ',it.events.length,'เหตุการณ์');
   releaseVid(it,'p');
   return 'done';
 }
@@ -809,8 +903,8 @@ async function runOne(it){
 }
 async function runQueue(cat){
   if(running)return;
-  if(ocrBusy)return alert('กำลังอ่านทะเบียนอยู่ — รอให้เสร็จก่อน');
-  if(!session)return alert('โมเดลตรวจรถยังไม่พร้อม — เลือกไฟล์ yolov8n.onnx ก่อน');
+  if(ocrBusy)return msg('กำลังอ่านทะเบียนอยู่ — รอให้เสร็จก่อน');
+  if(!session)return msg('โมเดลตรวจรถยังไม่พร้อม — เลือกไฟล์ yolov8n.onnx ก่อน');
   RUN={total:items.filter(i=>runnable(i,cat)).length,doneN:0};
   if(!RUN.total)return;
   running=true;stopF=false;hardStop=false;updBtns();
@@ -819,7 +913,7 @@ async function runQueue(cat){
   const left=items.filter(i=>runnable(i,cat)).length;
   $('ovT').textContent=hardStop?'หยุดแล้ว — ไฟล์นั้นจะเริ่มใหม่ตั้งแต่ต้น'
     :(stopF&&left)?'พักแล้ว — กด "ทำต่อ" เพื่อเริ่มจากจุดเดิม'
-    :`เสร็จทั้งหมด ${RUN.doneN} ไฟล์ — ไปแท็บ 4 เพื่ออ่านทะเบียน`;
+    :`เสร็จทั้งหมด ${RUN.doneN} ไฟล์ — ไปแท็บ 3 เพื่อตรวจทาน`;
   if(!stopF)$('ovBar').style.width='100%';
   $('pause').textContent='พัก';$('stop').textContent='หยุด';
   renderAll();
@@ -829,9 +923,9 @@ $('runCat').onclick=()=>{if(!items.some(i=>i.resume))$('evth').innerHTML='';refr
 $('pause').onclick=()=>{hardStop=false;stopF=true;$('pause').textContent='กำลังพัก…'};
 $('stop').onclick=()=>{hardStop=true;stopF=true;$('stop').textContent='กำลังหยุด…'};
 
-function addFiles(list){
+async function addFiles(list){
   const fs=[...list].filter(f=>/^video\//.test(f.type)||/\.(mp4|mov|mkv|webm|m4v|avi)$/i.test(f.name));
-  if(!fs.length)return alert('ไม่พบไฟล์วิดีโอ');
+  if(!fs.length)return msg('ไม่พบไฟล์วิดีโอ');
   const cat=filterCat==='all'?($('catSel').value||cats[0]):filterCat;
   fs.sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true}));
   for(const f of fs)items.push({id:++uid,file:f,name:f.name,cat,status:'wait',pct:0,events:[],p:null,r:null,url:null,dur:0,step:0,err:'',resume:null});
@@ -840,7 +934,7 @@ function addFiles(list){
 $('pickFiles').onclick=()=>$('vfile').click();
 $('vfile').onchange=e=>{addFiles(e.target.files);e.target.value=''};
 $('pickDir').onclick=async()=>{
-  if(!window.showDirectoryPicker)return alert('ต้องใช้ Chrome หรือ Edge');
+  if(!window.showDirectoryPicker)return msg('ต้องใช้ Chrome หรือ Edge');
   const d=await showDirectoryPicker(),fl=[];
   for await(const [n,h] of d.entries())if(h.kind==='file'&&/\.(mp4|mov|mkv|webm|m4v|avi)$/i.test(n))fl.push(await h.getFile());
   addFiles(fl);
@@ -890,9 +984,7 @@ function keepSel(sel,html){const v=sel.value;sel.innerHTML=html;if([...sel.optio
 function renderCats(){
   const n=c=>items.filter(i=>i.cat===c).length,d=c=>items.filter(i=>i.cat===c&&i.status==='done').length;
   $('cats').innerHTML=`<div class="cat ${filterCat==='all'?'on':''}" data-cat="all"><span>ทั้งหมด</span><small>${items.filter(i=>i.status==='done').length}/${items.length}</small></div>`+
-    cats.map(c=>`<div class="cat ${filterCat===c?'on':''}" data-cat="${esc(c)}"><span>${esc(c)}</span>
-      <span class="cact"><button data-ren="${esc(c)}" title="แก้ชื่อ">✎</button><button class="dng" data-del-cat="${esc(c)}" title="ลบหมวด">🗑</button></span>
-      <small>${d(c)}/${n(c)}</small></div>`).join('');
+    cats.map(c=>`<div class="cat ${filterCat===c?'on':''}" data-cat="${esc(c)}"><span>${esc(c)}</span><span class="cact"><button data-ren="${esc(c)}" title="แก้ชื่อ">✎</button><button class="dng" data-del-cat="${esc(c)}" title="ลบหมวด">🗑</button></span><small>${d(c)}/${n(c)}</small></div>`).join('');
   const opts=cats.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');
   keepSel($('catSel'),opts);keepSel($('zcat'),opts);
   keepSel($('rvCat'),`<option value="all">ทุกหมวด</option>`+opts);
@@ -907,10 +999,11 @@ $('cats').onclick=e=>{
   if(filterCat!=='all'){$('catSel').value=filterCat;$('rvCat').value=filterCat;$('ocCat').value=filterCat}
   renderAll();
 };
-  function renameCat(oldName){
-  const nn=(prompt('ชื่อหมวดใหม่',oldName)||'').trim();
+async function renameCat(oldName){
+  if(running)return msg('กำลังประมวลผลอยู่ — รอให้เสร็จก่อนแก้ชื่อหมวด');
+  const nn=((await promptD('ชื่อหมวดใหม่',oldName,'แก้ชื่อหมวด'))||'').trim();
   if(!nn||nn===oldName)return;
-  if(cats.includes(nn))return alert('มีหมวดชื่อนี้อยู่แล้ว');
+  if(cats.includes(nn))return msg(`มีหมวดชื่อ "${nn}" อยู่แล้ว`);
   cats=cats.map(c=>c===oldName?nn:c);
   localStorage.uCats=JSON.stringify(cats);
   items.forEach(i=>{if(i.cat===oldName)i.cat=nn});
@@ -918,10 +1011,12 @@ $('cats').onclick=e=>{
   if(filterCat===oldName)filterCat=nn;
   renderAll();
 }
-function deleteCat(name){
-  if(cats.length<=1)return alert('ต้องมีอย่างน้อยหนึ่งหมวด');
+async function deleteCat(name){
+  if(running)return msg('กำลังประมวลผลอยู่ — รอให้เสร็จก่อนลบหมวด');
+  if(cats.length<=1)return msg('ต้องมีอย่างน้อยหนึ่งหมวด');
   const cnt=items.filter(i=>i.cat===name).length;
-  if(!confirm(`ลบหมวด "${name}" ?${cnt?`\nวิดีโอ ${cnt} ไฟล์จะถูกย้ายไปหมวดแรกที่เหลือ`:''}`))return;
+  const ok=await confirmD(`ลบหมวด "${name}" ?${cnt?`\nวิดีโอ ${cnt} ไฟล์จะถูกย้ายไปหมวดอื่น`:''}`,'ลบหมวด');
+  if(!ok)return;
   const fallback=cats.find(c=>c!==name);
   cats=cats.filter(c=>c!==name);
   localStorage.uCats=JSON.stringify(cats);
@@ -954,6 +1049,8 @@ function updBtns(){
   $('pause').disabled=!running;
   $('stop').disabled=!running;
   $('exp').disabled=!items.some(i=>i.events.some(e=>e.ok===true));
+  $('expOne').disabled=!curEv();
+  $('undo').disabled=!hist.length;
   $('ocRun').disabled=ocrBusy||running;
 }
 function renderAll(){
@@ -1003,17 +1100,31 @@ function selectRV(id,k){REV={id,k};renderReview();showRV()}
 
 async function showRV(){
   const it=curIt(),e=curEv();
+  updBtns();
   if(!it||!e){vx.clearRect(0,0,vc.width,vc.height);$('info').textContent='';return}
   if(running){$('info').textContent='กำลังประมวลผลอยู่ — กด Y/N ได้ ภาพจะแสดงเมื่อจบหรือหยุด';return}
   items.forEach(x=>{if(x!==it)releaseVid(x,'r')});
   const v=await ensureVid(it,'r');
-  const S0=evS(it,e),E0=evE(it,e);
   const sl=$('sl');sl.step=RS;
-  sl.min=Math.floor(Math.max(0,S0-10)/RS)*RS;
-  sl.max=Math.max(+sl.min,Math.floor(Math.min(v.duration-0.05,E0+10)/RS)*RS);
+  sl.min=(Math.floor(Math.max(0,e.ts-10)/RS)*RS).toFixed(3);
+  sl.max=(Math.floor(Math.min(v.duration-0.05,e.te+10)/RS)*RS).toFixed(3);
   fillPlate(e);
-  await showFrame(S0);
+  await showFrame(e.ts);
   drawPlate();
+}
+// แสดงป้ายทะเบียน/ประเภท/สถานะบนภาพตัวอย่าง
+function drawBadge(e,w){
+  const p=e.plate;
+  const plateTxt=[p.f&&p.n?p.f+p.n:(p.f||p.n),p.v].filter(Boolean).join(' ');
+  const txt=(plateTxt||'ยังไม่มีทะเบียน')+(p.t?' · '+p.t:'');
+  const fs=Math.max(16,Math.round(w/32));
+  vx.font=`bold ${fs}px 'Leelawadee UI',Tahoma,Sarabun,sans-serif`;
+  const tw=vx.measureText(txt).width,padX=fs*0.5,bh=fs*1.6;
+  vx.fillStyle='rgba(0,0,0,.65)';vx.fillRect(12,12,tw+padX*2,bh);
+  vx.fillStyle=e.ok===true?'#3fb950':e.ok===false?'#f85149':'#f5a524';
+  vx.fillRect(12,12,6,bh);
+  vx.fillStyle='#fff';vx.textBaseline='middle';vx.fillText(txt,12+padX+4,12+bh/2);
+  vx.textBaseline='alphabetic';
 }
 async function showFrame(t){
   if(running)return;
@@ -1026,22 +1137,22 @@ async function showFrame(t){
     if(tok!==showTok){bmp.close();return}
     vc.width=bmp.width;vc.height=bmp.height;vx.drawImage(bmp,0,0);
     vx.fillStyle='#3fb950';
-    e.t.forEach(p=>{vx.beginPath();vx.arc(p.cx,p.cy,Math.max(4,bmp.width/200),0,7);vx.fill()});
-    // กรอบรถแสดงเฉพาะเฟรมที่ตรวจไว้ตอนประมวลผล (ทุก step) ส่วนเฟรมระหว่างกลางไม่มีกรอบ
-    let q=null;for(const p of e.t)if(Math.abs(p.i*it.step-t)<=it.step/2+1e-6){q=p;break}
+    e.pts.forEach(p=>{vx.beginPath();vx.arc(p.cx,p.cy,Math.max(4,bmp.width/200),0,7);vx.fill()});
+    const tol=Math.max(RS/2,it.step/2)+1e-6;
+    const q=e.pts.find(p=>Math.abs(p.t-t)<=tol);
     if(q){vx.strokeStyle='#f5a524';vx.lineWidth=Math.max(3,bmp.width/250);vx.strokeRect(q.b.x1,q.b.y1,q.b.x2-q.b.x1,q.b.y2-q.b.y1)}
+    drawBadge(e,bmp.width);
     bmp.close();
   }catch(err){$('info').textContent='ดึงภาพไม่ได้: '+err.message;return}
-  const S0=evS(it,e),E0=evE(it,e);
-  $('info').textContent=`${fmtMS(t)}${Math.abs(t-S0)<RS/2?' · จุดเริ่ม':''}${Math.abs(t-E0)<RS/2?' · จุดจบ (เห็นทะเบียน)':''} — ${it.name}`;
+  $('info').textContent=`${fmtMS(t)}${Math.abs(t-e.ts)<RS/2?' · จุดเริ่ม':''}${Math.abs(t-e.te)<RS/2?' · จุดจบ (เห็นทะเบียน)':''} — ${it.name}`;
 }
 async function drawPlate(){
   if(running)return;
   const it=curIt(),e=curEv();if(!it||!e)return;
   const my=++plTok;
-  let q=e.t[0];for(const p of e.t)if(Math.abs(p.i-e.e)<Math.abs(q.i-e.e))q=p;
+  const q=nearPt(e.pts,e.te);
   try{
-    const v=await ensureVid(it,'r'),bmp=await getFrame(v,evE(it,e));
+    const v=await ensureVid(it,'r'),bmp=await getFrame(v,e.te);
     if(my!==plTok){bmp.close();return}
     const b=q.b,m=0.08,w=b.x2-b.x1,h=b.y2-b.y1;
     const sx=Math.max(0,b.x1-w*m),sy=Math.max(0,b.y1-h*m);
@@ -1068,7 +1179,7 @@ function savePlate(){
 async function sendPTM(){
   const e=curEv();if(!e||!e.plate.n)return;
   try{await navigator.clipboard.writeText(JSON.stringify({_uturn:1,id:Date.now(),type:e.plate.t,f:e.plate.f,n:e.plate.n,prov:e.plate.v}))}
-  catch(err){alert('คัดลอกไม่สำเร็จ: '+err.message)}
+  catch(err){msg('คัดลอกไม่สำเร็จ: '+err.message)}
 }
 $('cptm').onclick=sendPTM;
 [['c1','pf'],['c2','pn'],['c3','pv']].forEach(([b,f])=>$(b).onclick=()=>navigator.clipboard.writeText($(f).value));
@@ -1076,8 +1187,11 @@ $('pf').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();$('pn').focus()}};
 $('pn').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();$('pv').focus()}};
 $('pv').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();savePlate();sendPTM();mark(true);$('pf').focus()}};
 
+// ---------- Y/N และย้อนกลับ ----------
 function mark(v){
   const it=curIt(),e=curEv();if(!it||!e)return;
+  hist.push({id:it.id,k:REV.k,ok:e.ok,plate:{...e.plate}});
+  if(hist.length>300)hist.shift();
   savePlate();e.ok=v;
   const idx=flat.findIndex(([id,k])=>id===REV.id&&k===REV.k);
   const only=$('rvOnly').checked;
@@ -1086,20 +1200,32 @@ function mark(v){
   if(flat.length&&next>=0){const [id,k]=flat[next];REV={id,k};renderReview();showRV()}
   else{REV={id:null,k:-1};renderReview();showRV()}
 }
+function undo(){
+  const h=hist.pop();
+  if(!h){updBtns();return}
+  const it=items.find(i=>i.id===h.id);
+  const e=it&&it.events[h.k];
+  if(!e){updBtns();return}
+  e.ok=h.ok;e.plate=h.plate;
+  REV={id:h.id,k:h.k};
+  renderReview();showRV();
+}
 function setStart(){const it=curIt(),e=curEv();if(!it||!e)return;
-  e.ts=Math.min(fi,evE(it,e));e.s=Math.round(e.ts/it.step);renderReview();showRV()}
+  e.ts=Math.min(fi,e.te);renderReview();showRV()}
 function setEnd(){const it=curIt(),e=curEv();if(!it||!e)return;
-  e.te=Math.max(fi,evS(it,e));e.e=Math.round(e.te/it.step);renderReview();showRV()}
+  e.te=Math.max(fi,e.ts);renderReview();showRV()}
 $('by').onclick=()=>mark(true);
 $('bn').onclick=()=>mark(false);
 $('bs').onclick=setStart;
 $('be').onclick=setEnd;
+$('undo').onclick=undo;
 $('sl').oninput=e=>showFrame(+e.target.value);
 
 document.addEventListener('keydown',e=>{
-  if($('v-review').hidden)return;
+  if($('v-review').hidden||!$('dlg').hidden)return;
   if(/INPUT|SELECT|TEXTAREA/.test(e.target.tagName)&&e.target.type!=='range')return;
   const k=e.key,big=e.shiftKey?25:1; // Shift = ข้ามทีละ ~1 วินาที
+  if((e.ctrlKey||e.metaKey)&&(k==='z'||k==='Z')){e.preventDefault();undo();return}
   if(k==='y'||k==='Y')mark(true);
   else if(k==='n'||k==='N')mark(false);
   else if(k==='ArrowRight'){e.preventDefault();showFrame(fi+RS*big)}
@@ -1152,85 +1278,108 @@ const expUI={
     $('expBar').style.width=(p*100)+'%';
     if(det!==undefined)$('expDet').textContent=det;
   },
-  done(msg){this.set(1,msg);$('expClose').hidden=false},
+  done(text){this.set(1,text);$('expClose').hidden=false},
   close(){$('expModal').hidden=true}
 };
 
 // ---------- ส่งออก ----------
-$('exp').onclick=async()=>{
-  const list=[];for(const it of items)for(const e of it.events)if(e.ok===true)list.push([it,e]);
-  if(!list.length)return;
+// ช่วงภาพแบบเป็นจังหวะเฟรม เพื่อให้ได้ภาพตรงกับตอนเลื่อนดู
+function rangeShots(a,b,step,label=''){
+  const out=[],k0=Math.round(a/RS),k1=Math.round(b/RS),ks=Math.max(1,Math.round(step/RS));
+  for(let k=k0;k<=k1;k+=ks)out.push({t:+(k*RS).toFixed(3),label});
+  if(!out.length)out.push({t:+(Math.round(b/RS)*RS).toFixed(3),label});
+  return out;
+}
+function makeShots(e,v,o){
+  const end=v.duration-0.05;
+  if(o.detail)return rangeShots(Math.max(0,e.ts-o.pre),Math.min(end,e.te+o.post),o.fine);
+  if(o.all)return rangeShots(Math.max(0,e.ts-o.pre),Math.min(end,e.te+o.post),Math.max(o.fine,0.5));
+  return [
+    {t:+Math.max(0,e.ts-o.pre).toFixed(3),label:'1_ก่อนกระทำผิด_'},
+    {t:+((e.ts+e.te)/2).toFixed(3),label:'2_ระหว่างกระทำผิด_'},
+    {t:+Math.min(end,e.te).toFixed(3),label:'3_ทะเบียน_'}
+  ];
+}
+// ดึงเฟรมแล้วแปลงเป็น JPEG
+async function prepBlob(v,t,q){
+  const bmp=await getFrame(v,t),cv=document.createElement('canvas');
+  cv.width=bmp.width;cv.height=bmp.height;cv.getContext('2d').drawImage(bmp,0,0);bmp.close();
+  return new Promise(r=>cv.toBlob(r,'image/jpeg',q));
+}
+async function writeBlob(dir,fn,blob){
+  const fh=await dir.getFileHandle(fn,{create:true}),w=await fh.createWritable();
+  await w.write(blob);await w.close();
+}
+// ส่งออกรายการเหตุการณ์ (ใช้ได้ทั้งส่งออกทั้งหมดและส่งออกเหตุการณ์เดียว)
+async function exportEvents(list){
   let root;try{root=await showDirectoryPicker({mode:'readwrite',id:'uturn-out'})}catch(err){return}
-  const o=S();
-  let csv='\ufeffหมวด,ไฟล์วิดีโอ,จุดเริ่ม,จุดจบ,มุมกลับรถ,ประเภทรถ,รหัสประเภท,หมวดทะเบียน,เลข,จังหวัด,โฟลเดอร์\n';
-
-  // คำนวณรายการภาพล่วงหน้า เพื่อแสดงเปอร์เซ็นให้ถูกต้อง
+  const o=S(),q=o.detail?0.95:0.93;
   const plans=[];
   for(const [it,e] of list){
     const v=await ensureVid(it,'r');
-    const sT=evS(it,e),eT=evE(it,e);
-    let shots=[];
-    if(o.detail){
-      // ปัดเวลาให้ตรงจังหวะเฟรม (RS) เหมือนตอนเลื่อนดู
-      const k0=Math.round(Math.max(0,sT-o.pre)/RS);
-      const k1=Math.round(Math.min(v.duration-0.05,eT+o.post)/RS);
-      const kStep=Math.max(1,Math.round(o.fine/RS));
-      for(let k=k0;k<=k1;k+=kStep)shots.push({t:+(k*RS).toFixed(3),label:''});
-      if(!shots.length)shots.push({t:+(Math.round(eT/RS)*RS).toFixed(3),label:''});
-    }else{
-      const last=Math.max(0,Math.floor(v.duration/it.step)-1);
-      const sIdx=Math.round(sT/it.step),eIdx=Math.round(eT/it.step);
-      const pre=Math.round(o.pre/it.step),post=Math.round(o.post/it.step);
-      const before=Math.max(0,sIdx-pre),mid=Math.round((sIdx+eIdx)/2);
-      const idx=o.all
-        ? Array.from({length:Math.max(1,Math.min(last,eIdx+post)-before+1)},(_,k)=>before+k)
-        : [...new Set([before,mid,eIdx])];
-      shots=idx.map(i=>({
-        t:i*it.step,
-        label:o.all?(i===eIdx?'3_ทะเบียน_':''):(i===before?'1_ก่อนกระทำผิด_':i===eIdx?'3_ทะเบียน_':i===mid?'2_ระหว่างกระทำผิด_':'')
-      }));
-    }
-    plans.push({it,e,v,shots});
+    plans.push({it,e,v,shots:makeShots(e,v,o)});
   }
   const totalShots=plans.reduce((a,p)=>a+p.shots.length,0);
-  let doneShots=0;
+
+  // ประมาณขนาดจากภาพตัวอย่าง 1 ภาพ แล้วเตือนถ้าใหญ่เกิน 500 MB
+  let estBytes=0;
+  try{const sb=await prepBlob(plans[0].v,plans[0].shots[0].t,q);estBytes=sb.size*totalShots}
+  catch(err){console.warn('estimate',err)}
+  if(estBytes>500e6){
+    const ok=await confirmD(`จะส่งออก ${totalShots} ภาพ ใช้พื้นที่ประมาณ ${fmtBytes(estBytes)}\n\nเบราว์เซอร์อ่านพื้นที่ว่างของดิสก์ไม่ได้ กรุณาตรวจว่าปลายทางมีพื้นที่พอก่อนดำเนินการต่อ`,'ตรวจพื้นที่ก่อนส่งออก');
+    if(!ok)return;
+  }
 
   expUI.open();
-  const vidDirs=new Map(); // โฟลเดอร์ต่อวิดีโอ หนึ่งวิดีโอใช้โฟลเดอร์เดียว
-  const cv=document.createElement('canvas'),cx=cv.getContext('2d');
+  const vidDirs=new Map();
+  let csv='\ufeffหมวด,ไฟล์วิดีโอ,จุดเริ่ม,จุดจบ,มุมกลับรถ,ประเภทรถ,รหัสประเภท,หมวดทะเบียน,เลข,จังหวัด,โฟลเดอร์\n';
+  let done=0,csvName='';
+  try{
+    for(const {it,e,v,shots} of plans){
+      const p=e.plate;
+      const cdir=await root.getDirectoryHandle(safe(it.cat),{create:true});
+      if(!vidDirs.has(it.id)){
+        const vn=await uniqueName(cdir,safe(it.name.replace(/\.[^.]+$/,'')),'','dir');
+        vidDirs.set(it.id,await cdir.getDirectoryHandle(vn,{create:true}));
+      }
+      const vidDir=vidDirs.get(it.id);
+      const no=it.events.indexOf(e)+1;
+      const plateTxt=[p.f&&p.n?p.f+p.n:(p.f||p.n),p.v].filter(Boolean).join('-');
+      const evLabel=`เหตุการณ์${String(no).padStart(3,'0')}${plateTxt?'_'+safe(plateTxt):''}`;
+      const evDir=await vidDir.getDirectoryHandle(await uniqueName(vidDir,evLabel,'','dir'),{create:true});
 
-  for(let n=0;n<plans.length;n++){
-    const {it,e,v,shots}=plans[n],p=e.plate;
-    const cdir=await root.getDirectoryHandle(safe(it.cat),{create:true});
-    if(!vidDirs.has(it.id)){
-      const vn=await uniqueName(cdir,safe(it.name.replace(/\.[^.]+$/,'')),'','dir');
-      vidDirs.set(it.id,await cdir.getDirectoryHandle(vn,{create:true}));
+      // ดึงภาพถัดไปพร้อมกับการเขียนไฟล์ภาพปัจจุบัน (pipeline)
+      let pend=prepBlob(v,shots[0].t,q);
+      for(let k=0;k<shots.length;k++){
+        const sh=shots[k];
+        const blob=await pend;
+        pend=k+1<shots.length?prepBlob(v,shots[k+1].t,q):null;
+        const fn=`${evLabel}_${sh.label}${clockTag(it.name,sh.t)}.jpg`;
+        await writeBlob(evDir,fn,blob);
+        done++;
+        expUI.set(done/totalShots,`${evLabel} · ${done}/${totalShots} ภาพ · ${fn}`);
+      }
+      csv+=[it.cat,it.name,fmtMS(e.ts),fmtMS(e.te),e.ang?Math.round(e.ang):'A→B',p.t,VCODE[p.t]||'',p.f,p.n,p.v,`${vidDir.name}/${evDir.name}`].map(csvq).join(',')+'\n';
     }
-    const vidDir=vidDirs.get(it.id);
-    const plateTxt=[p.f&&p.n?p.f+p.n:(p.f||p.n),p.v].filter(Boolean).join('-');
-    const evLabel=`เหตุการณ์${String(n+1).padStart(3,'0')}${plateTxt?'_'+safe(plateTxt):''}`;
-    // โฟลเดอร์ย่อยต่อเหตุการณ์ ชื่อเดียวกับ evLabel (ถ้าซ้ำจะลงท้าย _2)
-    const dir=await vidDir.getDirectoryHandle(await uniqueName(vidDir,evLabel,'','dir'),{create:true});
-    const folder=`${vidDir.name}/${dir.name}`;
-    const sT=evS(it,e),eT=evE(it,e);
-
-    for(const {t,label} of shots){
-      const bmp=await getFrame(v,t);
-      cv.width=bmp.width;cv.height=bmp.height;cx.drawImage(bmp,0,0);bmp.close();
-      const blob=await new Promise(r=>cv.toBlob(r,'image/jpeg',o.detail?0.95:0.93));
-      const fn=`${evLabel}_${label}${clockTag(it.name,t)}.jpg`;
-      const fh=await dir.getFileHandle(fn,{create:true}),w=await fh.createWritable();
-      await w.write(blob);await w.close();
-      doneShots++;
-      expUI.set(doneShots/totalShots,`เหตุการณ์ ${n+1}/${plans.length} · ${doneShots}/${totalShots} ภาพ · ${fn}`);
-    }
-    csv+=[it.cat,it.name,fmtMS(sT),fmtMS(eT),e.ang?Math.round(e.ang):'A→B',p.t,VCODE[p.t]||'',p.f,p.n,p.v,folder].map(csvq).join(',')+'\n';
+    csvName=await uniqueName(root,'สรุป','.csv','file');
+    await writeBlob(root,csvName,new Blob([csv],{type:'text/csv'}));
+    $('exs').textContent=`เสร็จแล้ว ${plans.length} เหตุการณ์ → ${root.name}`;
+    expUI.done(`เสร็จแล้ว ${totalShots} ภาพ · ${plans.length} เหตุการณ์ → ${root.name}\nไฟล์สรุป: ${csvName}`);
+  }catch(err){
+    console.error(err);
+    expUI.close();
+    $('exs').textContent='ส่งออกไม่สำเร็จ';
+    await msg(`ส่งออกไม่สำเร็จหลังเขียนไป ${done}/${totalShots} ภาพ\n${err.message||err}\n\nอาจเป็นเพราะพื้นที่เต็มหรือไม่มีสิทธิ์เขียนโฟลเดอร์`,'ส่งออกไม่สำเร็จ');
   }
-  const csvName=await uniqueName(root,'สรุป','.csv','file');
-  const w=await(await root.getFileHandle(csvName,{create:true})).createWritable();
-  await w.write(csv);await w.close();
-  $('exs').textContent=`เสร็จแล้ว ${list.length} เหตุการณ์ → ${root.name}`;
-  expUI.done(`เสร็จแล้ว ${totalShots} ภาพ · ${list.length} เหตุการณ์ · ไฟล์สรุป: ${csvName}`);
+}
+$('exp').onclick=()=>{
+  const list=[];for(const it of items)for(const e of it.events)if(e.ok===true)list.push([it,e]);
+  if(!list.length)return msg('ยังไม่มีเหตุการณ์ที่ยืนยันแล้ว (กด Y ก่อน)');
+  return exportEvents(list);
+};
+$('expOne').onclick=()=>{
+  const it=curIt(),e=curEv();if(!it||!e)return;
+  return exportEvents([[it,e]]);
 };
 
 // ---------- เริ่มทำงาน ----------
