@@ -52,7 +52,7 @@ input[type=number]{width:76px}
 .st.done{background:#11261a;color:var(--ok)}
 .st.err{background:#2a1214;color:var(--no)}
 canvas{max-width:100%;display:block;background:#000;border-radius:8px}
-#vc{max-width:100%;max-height:calc(100vh - 260px);width:auto;height:auto;object-fit:contain}
+#vc{max-width:100%;max-height:max(200px,min(calc(100vh - 400px),420px));width:auto;height:auto;object-fit:contain}
 #zc{cursor:crosshair}
 #evth{display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;margin-top:10px}
 .th{flex:0 0 150px;font-size:11px;color:var(--mu)}
@@ -334,7 +334,7 @@ const S=()=>{const step=Math.max(0.2,+$('step').value||0.5);return{
   minPts:3,
   hang:Math.max(1,Math.round(2/step)),   // หลังเห็นการเคลื่อนไหว ตรวจต่อ ~2 วิ
   live:$('lvon').checked,all:$('exall').checked,
-  detail:$('detail').checked,fine:Math.max(0.04,+$('fine').value||0.25),
+  detail:$('detail').checked,fine:Math.max(1,Math.round((+$('fine').value||0.25)/RS))*RS,
   idleK:Math.max(1,Math.round((+$('idle').value||2)/step))
 }};
 
@@ -1134,9 +1134,12 @@ $('exp').onclick=async()=>{
     const sT=evS(it,e),eT=evE(it,e);
     let shots=[];
     if(o.detail&&!o.all){
-      const a=Math.max(0,sT-o.pre),b=Math.min(v.duration-0.05,eT+o.post);
-      for(let t=a;t<=b+1e-6;t+=o.fine)shots.push({t:+t.toFixed(3),label:''});
-      if(!shots.length)shots.push({t:eT,label:''});
+      // ปัดเวลาให้ตรงจังหวะเฟรม (RS) เหมือนตอนเลื่อนดู เพื่อให้ได้ภาพเหมือนกันทุกเฟรม
+      const k0=Math.round(Math.max(0,sT-o.pre)/RS);
+      const k1=Math.round(Math.min(v.duration-0.05,eT+o.post)/RS);
+      const kStep=Math.max(1,Math.round(o.fine/RS));
+      for(let k=k0;k<=k1;k+=kStep)shots.push({t:+(k*RS).toFixed(3),label:''});
+      if(!shots.length)shots.push({t:+(Math.round(eT/RS)*RS).toFixed(3),label:''});
     }else{
       const last=Math.max(0,Math.floor(v.duration/it.step)-1);
       const sIdx=Math.round(sT/it.step),eIdx=Math.round(eT/it.step);
