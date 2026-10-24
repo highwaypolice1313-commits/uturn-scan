@@ -413,7 +413,7 @@ function seek(v,t){return new Promise(r=>{
 function getFrame(v,t){
   const job=async()=>{
     for(let k=0;k<2;k++){
-      try{await withTO(seek(v,t),4000,'seek timeout');return await withTO(createImageBitmap(v),4000,'bitmap timeout')}
+      try{await withTO(seek(v,t),10000,'seek timeout');return await withTO(createImageBitmap(v),10000,'bitmap timeout')}
       catch(e){if(k===1)throw e;await new Promise(r=>setTimeout(r,80))}
     }
   };
@@ -1168,12 +1168,13 @@ $('exp').onclick=async()=>{
     const dir=await cdir.getDirectoryHandle(folder,{create:true});
     const sT=evS(it,e),eT=evE(it,e);
 
+    // โฟลเดอร์เหตุการณ์เป็นโฟลเดอร์ใหม่และเวลาแต่ละภาพไม่ซ้ำ จึงไม่ต้องเช็กชื่อซ้ำทุกภาพ
+    const cv=document.createElement('canvas');const cx=cv.getContext('2d');
     for(const {t,label} of shots){
-      const bmp=await getFrame(v,t),c=document.createElement('canvas');
-      c.width=bmp.width;c.height=bmp.height;c.getContext('2d').drawImage(bmp,0,0);bmp.close();
-      const blob=await new Promise(r=>c.toBlob(r,'image/jpeg',o.detail?0.98:0.93));
-      const base=label+safe(it.name.replace(/\.[^.]+$/,''))+'_'+tag(t);
-      const fn=await uniqueName(dir,base,'.jpg','file');
+      const bmp=await getFrame(v,t);
+      cv.width=bmp.width;cv.height=bmp.height;cx.drawImage(bmp,0,0);bmp.close();
+      const blob=await new Promise(r=>cv.toBlob(r,'image/jpeg',o.detail?0.95:0.93));
+      const fn=label+safe(it.name.replace(/\.[^.]+$/,''))+'_'+tag(t)+'.jpg';
       const fh=await dir.getFileHandle(fn,{create:true}),w=await fh.createWritable();
       await w.write(blob);await w.close();
       doneShots++;
