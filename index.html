@@ -144,7 +144,7 @@ canvas{max-width:100%;display:block;background:#000;border-radius:8px}
     <div class="card">
       <h2>ตั้งค่าการตรวจ <span class="mu">(ระบบจำค่าไว้ให้อัตโนมัติ)</span></h2>
       <div class="row">
-        <label>ตรวจทุก <input type="number" id="step" value="0.5" step="0.5" min="0.2"> วินาที</label>
+        <label>ตรวจทุก <input type="number" id="step" value="0.5" step="0.1" min="0.2"> วินาที</label>
         <label>ความมั่นใจ <input type="number" id="conf" value="0.35" step="0.05" min="0.1" max="0.9"></label>
         <label>ความไวตัดเฟรมว่าง <input type="number" id="mot" value="4" min="1"></label>
         <label>มุมกลับรถ ≥ <input type="number" id="ang" value="120" min="60" max="180">°</label>
@@ -161,7 +161,8 @@ canvas{max-width:100%;display:block;background:#000;border-radius:8px}
         <div class="row">
           <button id="runCat">เริ่มเฉพาะหมวด</button>
           <button id="runAll" class="pri">เริ่มทั้งหมด</button>
-          <button id="stop" class="dng">หยุด</button>
+          <button id="pause" disabled>พัก</button>
+          <button id="stop" class="dng" disabled>หยุด</button>
         </div>
       </div>
       <div class="bar big"><i id="ovBar"></i></div>
@@ -212,7 +213,7 @@ canvas{max-width:100%;display:block;background:#000;border-radius:8px}
         <div class="row">
           <label><input type="checkbox" id="exall"> ส่งออกทุกภาพในช่วง</label>
           <label><input type="checkbox" id="detail" checked> จับภาพละเอียดรอบเหตุการณ์</label>
-          <label>ทุก <input type="number" id="fine" value="0.25" step="0.05" min="0.1" style="width:64px"> วิ</label>
+          <label>ทุก <input type="number" id="fine" value="0.25" step="0.01" min="0.04" style="width:64px"> วิ</label>
           <button id="exp" class="pri" disabled>ส่งออกที่ยืนยันแล้ว</button>
           <span id="exs" class="mu"></span>
         </div>
@@ -232,7 +233,7 @@ canvas{max-width:100%;display:block;background:#000;border-radius:8px}
             <button id="bs">ตั้งจุดเริ่ม [</button>
             <button id="be">ตั้งจุดจบ ]</button>
           </div>
-          <div class="mu" style="margin-top:8px">← → เลื่อนเฟรม · ↑ ↓ เปลี่ยนเหตุการณ์ · Y/N ยืนยันแล้วไปรายการถัดไปอัตโนมัติ</div>
+          <div class="mu" style="margin-top:8px">← → ทีละเฟรม · Shift+← → ทีละ ~1 วิ · ↑ ↓ เปลี่ยนเหตุการณ์ · Y/N ยืนยันแล้วไปรายการถัดไปอัตโนมัติ</div>
         </div>
 
         <div class="card plate">
@@ -295,6 +296,8 @@ canvas{max-width:100%;display:block;background:#000;border-radius:8px}
 const $=id=>document.getElementById(id);
 const pad=x=>String(x).padStart(2,'0');
 const fmtT=s=>{s=Math.max(0,s);return pad(Math.floor(s/3600))+':'+pad(Math.floor(s%3600/60))+':'+pad(Math.floor(s%60))};
+const fmtMS=s=>{s=Math.max(0,s);const ms=Math.round(s*1000);
+  return pad(Math.floor(ms/3600000))+':'+pad(Math.floor(ms%3600000/60000))+':'+pad(Math.floor(ms%60000/1000))+'.'+String(ms%1000).padStart(3,'0')};
 const fmtSec=s=>s<60?Math.round(s)+' วิ':Math.floor(s/60)+' นาที '+Math.round(s%60)+' วิ';
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const safe=s=>String(s).replace(/[\\/:*?"<>|\r\n\t]/g,'_').trim().slice(0,80)||'x';
@@ -303,13 +306,18 @@ const ZC={a:'245,165,36',b:'74,163,255'};
 const BADGE={wait:'รอคิว',run:'กำลังทำ',done:'เสร็จ',err:'ผิดพลาด'};
 const withTO=(p,ms,msg)=>Promise.race([p,new Promise((_,j)=>setTimeout(()=>j(new Error(msg)),ms))]);
 
+// ระยะเลื่อนละเอียด = 1 เฟรม (~25fps) และเวลาเริ่ม/จบของเหตุการณ์ (วินาที)
+const RS=0.04;
+const evS=(it,e)=>e.ts!=null?e.ts:e.s*it.step;
+const evE=(it,e)=>e.te!=null?e.te:e.e*it.step;
+
 // ตารางรหัสประเภทรถ (ตรวจกับตารางทางการของกรมการขนส่งทางบกก่อนใช้จริง)
 const VCODE={'รถเก๋ง/รถนั่ง':'01','แท็กซี่':'07','รถกระบะ':'03','รถบรรทุกส่วนบุคคล':'35'};
 const VTYPES=[...Object.keys(VCODE),'อื่นๆ'];
 
 const PROV='กรุงเทพมหานคร กระบี่ กาญจนบุรี กาฬสินธุ์ กำแพงเพชร ขอนแก่น จันทบุรี ฉะเชิงเทรา ชลบุรี ชัยนาท ชัยภูมิ ชุมพร เชียงราย เชียงใหม่ ตรัง ตราด ตาก นครนายก นครปฐม นครพนม นครราชสีมา นครศรีธรรมราช นครสวรรค์ นนทบุรี นราธิวาส น่าน บึงกาฬ บุรีรัมย์ ปทุมธานี ประจวบคีรีขันธ์ ปราจีนบุรี ปัตตานี พระนครศรีอยุธยา พะเยา พังงา พัทลุง พิจิตร พิษณุโลก เพชรบุรี เพชรบูรณ์ แพร่ ภูเก็ต มหาสารคาม มุกดาหาร แม่ฮ่องสอน ยโสธร ยะลา ร้อยเอ็ด ระนอง ระยอง ราชบุรี ลพบุรี ลำปาง ลำพูน เลย ศรีสะเกษ สกลนคร สงขลา สตูล สมุทรปราการ สมุทรสงคราม สมุทรสาคร สระแก้ว สระบุรี สิงห์บุรี สุโขทัย สุพรรณบุรี สุราษฎร์ธานี สุรินทร์ หนองคาย หนองบัวลำภู อ่างทอง อำนาจเจริญ อุดรธานี อุตรดิตถ์ อุทัยธานี อุบลราชธานี'.split(' ');
 
-let items=[],uid=0,filterCat='all',running=false,stopF=false,session=null,vcls=null,ocrW=null;
+let items=[],uid=0,filterCat='all',running=false,stopF=false,hardStop=false,session=null,vcls=null,ocrW=null;
 let ocrBusy=false,ocrStopF=false;
 let RUN={total:0,doneN:0};
 let cats=JSON.parse(localStorage.uCats||'null')||['ทั่วไป'];
@@ -321,9 +329,12 @@ const ang=(a,b)=>Math.acos(Math.max(-1,Math.min(1,(a[0]*b[0]+a[1]*b[1])/((Math.h
 const poly=(c,z,w,h)=>{c.beginPath();z.forEach(([x,y],i)=>i?c.lineTo(x*w,y*h):c.moveTo(x*w,y*h));if(z.length>2)c.closePath()};
 const S=()=>{const step=Math.max(0.2,+$('step').value||0.5);return{
   step,conf:+$('conf').value||0.35,mot:(+$('mot').value||4)/1000,ang:+$('ang').value||120,
-  pre:+$('pre').value||0,post:+$('post').value||0,lost:8,minPts:3,hang:3,
+  pre:+$('pre').value||0,post:+$('post').value||0,
+  lost:Math.max(2,Math.round(4/step)),   // หายจากเฟรมนานกว่า ~4 วิ ถึงจะตัดว่าจบ
+  minPts:3,
+  hang:Math.max(1,Math.round(2/step)),   // หลังเห็นการเคลื่อนไหว ตรวจต่อ ~2 วิ
   live:$('lvon').checked,all:$('exall').checked,
-  detail:$('detail').checked,fine:Math.max(0.1,+$('fine').value||0.25),
+  detail:$('detail').checked,fine:Math.max(0.04,+$('fine').value||0.25),
   idleK:Math.max(1,Math.round((+$('idle').value||2)/step))
 }};
 
@@ -626,7 +637,7 @@ async function classifyVehicle(src){
 async function ocrOne(it,e){
   const v=await ensureVid(it,'r');
   const q=e.t.find(p=>p.i===e.e)||e.t[e.t.length-1];
-  const bmp=await getFrame(v,e.e*it.step);
+  const bmp=await getFrame(v,evE(it,e));
   try{
     const pc=cropBox(bmp,plateBox(q.b));
     e.plateImg=pc.toDataURL('image/jpeg',0.85);
@@ -660,7 +671,7 @@ function renderOcr(){
       ${e.plateImg?`<img src="${e.plateImg}" alt="">`:'<div class="mu">ยังไม่มีภาพป้าย</div>'}
       <div style="min-width:0">
         <div class="fn" title="${esc(it.name)}">${esc(it.name)}</div>
-        <div class="mu">${esc(it.cat)} · ${fmtT(e.s*it.step)} → ${fmtT(e.e*it.step)}</div>
+        <div class="mu">${esc(it.cat)} · ${fmtMS(evS(it,e))} → ${fmtMS(evE(it,e))}</div>
         <div class="ores">${res}</div>
         <div class="mu">ทะเบียนที่บันทึก: ${esc(e.plate.f)} ${esc(e.plate.n)} ${esc(e.plate.v)} ${e.plate.t?'· '+esc(e.plate.t):''}</div>
       </div>
@@ -712,14 +723,20 @@ $('ocList').addEventListener('click',async e=>{
   ocrBusy=false;renderOcr();
 });
 
-// ---------- ประมวลผลวิดีโอหนึ่งไฟล์ ----------
+// ---------- ประมวลผลวิดีโอหนึ่งไฟล์ (พัก/ทำต่อได้) ----------
 async function processItem(it){
   items.forEach(x=>{if(x!==it){releaseVid(x,'p');releaseVid(x,'r')}});
-  const v=await ensureVid(it,'p'),o=S(),n=Math.max(1,Math.floor(v.duration/o.step));
+  const v=await ensureVid(it,'p');
+  const R=it.resume||{C:null,i:0,prev:null,hang:0,det:0,elapsed:0};
+  if(!R.C){
+    const o0=S();
+    R.C={tracks:[],evs:[],thumbed:0,Z:zonesOf(it.cat),o:o0,W:v.videoWidth,H:v.videoHeight};
+  }
+  const C=R.C,o=C.o,n=Math.max(1,Math.floor(v.duration/o.step));
   it.step=o.step;it.dur=v.duration;
-  const C={tracks:[],evs:[],thumbed:0,Z:zonesOf(it.cat),o,W:v.videoWidth,H:v.videoHeight};
-  let prev=null,hang=0,det=0;const t0=performance.now();
-  let i=0;
+  let i=R.i,prev=R.prev,hang=R.hang,det=R.det;
+  const t0=performance.now()-R.elapsed*1000;
+
   while(i<n&&!stopF){
     let bmp;
     try{bmp=await getFrame(v,i*o.step)}
@@ -744,54 +761,76 @@ async function processItem(it){
     await thumbNew(C,v,it);
     bmp.close();
 
-    // มีรถ/มีการเคลื่อนไหว → ทีละเฟรม, ไม่มี → กรอตาม idleK
     const stride=hang>0?1:o.idleK;
     if(det%4===0||i+stride>=n){prog(it,Math.min(i,n-1),n,t0,det,C.evs.length);await new Promise(r=>setTimeout(r,0))}
     i+=stride;
   }
+
+  // หยุดกลางคัน: พักไว้ หรือล้างเพื่อเริ่มใหม่
+  if(i<n){
+    if(hardStop){
+      it.resume=null;it.events=[];
+    }else{
+      it.resume={C,i,prev,hang,det,elapsed:(performance.now()-t0)/1000};
+      it.pct=i/n*100;
+    }
+    releaseVid(it,'p');
+    return 'paused';
+  }
+
+  // ทำจนจบ
   closeStale(C,0,true);
   await thumbNew(C,v,it);
   it.events=C.evs.sort((a,b)=>a.s-b.s).map(e=>({...e,ok:null,plate:{t:'',f:'',n:'',v:''},auto:null,plateImg:null,ocrState:null,ocrErr:''}));
+  it.resume=null;
   console.log('เสร็จลูปเฟรม',it.name,'พบ',it.events.length,'เหตุการณ์');
   releaseVid(it,'p');
+  return 'done';
 }
 
 // ---------- คิว ----------
 function runnable(i,cat){return i.status==='wait'&&(!cat||cat==='all'||i.cat===cat)}
+async function runOne(it){
+  it.status='run';if(!it.resume)it.pct=0;renderQueue();updBtns();
+  try{
+    const r=await processItem(it);
+    if(r==='done'){it.status='done';it.pct=100;RUN.doneN++}
+    else{it.status='wait'}
+  }catch(e){
+    console.error('ไฟล์',it.name,e);
+    it.status='err';it.err=e.message||String(e);it.resume=null;RUN.doneN++;
+  }
+  finally{releaseVid(it,'p')}
+  renderQueue();renderStats();renderCats();updBtns();
+}
 async function runQueue(cat){
   if(running)return;
   if(ocrBusy)return alert('กำลังอ่านทะเบียนอยู่ — รอให้เสร็จก่อน');
   if(!session)return alert('โมเดลตรวจรถยังไม่พร้อม — เลือกไฟล์ yolov8n.onnx ก่อน');
   RUN={total:items.filter(i=>runnable(i,cat)).length,doneN:0};
   if(!RUN.total)return;
-  running=true;stopF=false;updBtns();
+  running=true;stopF=false;hardStop=false;updBtns();
   while(!stopF){const it=items.find(i=>runnable(i,cat));if(!it)break;await runOne(it)}
   running=false;
-  $('ovT').textContent=stopF?'หยุดแล้ว — ไฟล์ที่ยังไม่เสร็จจะกลับเข้าคิว':`เสร็จทั้งหมด ${RUN.doneN} ไฟล์ — ไปแท็บ 4 เพื่ออ่านทะเบียน`;
+  const left=items.filter(i=>runnable(i,cat)).length;
+  $('ovT').textContent=hardStop?'หยุดแล้ว — ไฟล์นั้นจะเริ่มใหม่ตั้งแต่ต้น'
+    :(stopF&&left)?'พักแล้ว — กด "ทำต่อ" เพื่อเริ่มจากจุดเดิม'
+    :`เสร็จทั้งหมด ${RUN.doneN} ไฟล์ — ไปแท็บ 4 เพื่ออ่านทะเบียน`;
   if(!stopF)$('ovBar').style.width='100%';
-  $('stop').textContent='หยุด';
+  $('pause').textContent='พัก';$('stop').textContent='หยุด';
   renderAll();
 }
-async function runOne(it){
-  it.status='run';it.pct=0;it.events=[];renderQueue();updBtns();
-  try{
-    await processItem(it);
-    if(stopF){it.status='wait';it.pct=0;it.events=[]}
-    else{it.status='done';it.pct=100;RUN.doneN++}
-  }catch(e){console.error('ไฟล์',it.name,e);it.status='err';it.err=e.message||String(e);RUN.doneN++}
-  finally{releaseVid(it,'p')}
-  renderQueue();renderStats();renderCats();updBtns();
-}
-$('runAll').onclick=()=>{$('evth').innerHTML='';refreshLiveBox();runQueue(null)};
-$('runCat').onclick=()=>{$('evth').innerHTML='';refreshLiveBox();runQueue(filterCat)};
-$('stop').onclick=()=>{stopF=true;$('stop').textContent='กำลังหยุด…'};
+$('runAll').onclick=()=>{if(!items.some(i=>i.resume))$('evth').innerHTML='';refreshLiveBox();runQueue(null)};
+$('runCat').onclick=()=>{if(!items.some(i=>i.resume))$('evth').innerHTML='';refreshLiveBox();runQueue(filterCat)};
+$('pause').onclick=()=>{hardStop=false;stopF=true;$('pause').textContent='กำลังพัก…'};
+$('stop').onclick=()=>{hardStop=true;stopF=true;$('stop').textContent='กำลังหยุด…'};
 
 function addFiles(list){
   const fs=[...list].filter(f=>/^video\//.test(f.type)||/\.(mp4|mov|mkv|webm|m4v|avi)$/i.test(f.name));
   if(!fs.length)return alert('ไม่พบไฟล์วิดีโอ');
   const cat=filterCat==='all'?($('catSel').value||cats[0]):filterCat;
   fs.sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true}));
-  for(const f of fs)items.push({id:++uid,file:f,name:f.name,cat,status:'wait',pct:0,events:[],p:null,r:null,url:null,dur:0,step:0,err:''});
+  for(const f of fs)items.push({id:++uid,file:f,name:f.name,cat,status:'wait',pct:0,events:[],p:null,r:null,url:null,dur:0,step:0,err:'',resume:null});
   renderAll();
 }
 $('pickFiles').onclick=()=>$('vfile').click();
@@ -814,11 +853,12 @@ function infoOf(it){
 }
 function rowHTML(it){
   const lock=it.status==='run';
+  const label=it.resume&&it.status==='wait'?'พักไว้':BADGE[it.status];
   return `<div class="qi" id="r${it.id}">
     <div style="min-width:0"><div class="fn" title="${esc(it.name)}">${esc(it.name)}</div><div class="mu" data-info>${esc(infoOf(it))}</div></div>
     <select data-cat-id="${it.id}" ${lock?'disabled':''}>${cats.map(c=>`<option value="${esc(c)}" ${c===it.cat?'selected':''}>${esc(c)}</option>`).join('')}</select>
     <div class="bar"><i style="width:${it.pct}%"></i></div>
-    <span class="st ${it.status}">${BADGE[it.status]}</span>
+    <span class="st ${it.status}">${label}</span>
     <button class="icon dng" data-del="${it.id}" ${lock?'disabled':''} title="ลบออกจากคิว">✕</button>
   </div>`;
 }
@@ -875,9 +915,11 @@ function renderStats(){
 function updBtns(){
   const waiting=items.filter(i=>i.status==='wait');
   $('runAll').disabled=running||ocrBusy||!session||!waiting.length;
+  $('runAll').textContent=waiting.some(i=>i.resume)?'ทำต่อ':'เริ่มทั้งหมด';
   const hasCat=waiting.some(i=>filterCat==='all'||i.cat===filterCat);
   $('runCat').disabled=running||ocrBusy||!session||!hasCat||filterCat==='all';
   $('runCat').textContent=filterCat==='all'?'เริ่มเฉพาะหมวด (เลือกหมวดก่อน)':`เริ่มหมวด "${filterCat}"`;
+  $('pause').disabled=!running;
   $('stop').disabled=!running;
   $('exp').disabled=!items.some(i=>i.events.some(e=>e.ok===true));
   $('ocRun').disabled=ocrBusy||running;
@@ -914,7 +956,7 @@ function renderReview(){
       const idx=flat.length;flat.push([it.id,k]);
       const sel=REV.id===it.id&&REV.k===k?' sel':'',st=e.ok===true?' y':e.ok===false?' n':'';
       const tag=e.auto&&e.auto.type?` · ${esc(e.auto.type)}`:'';
-      h+=`<div class="ev${sel}${st}" data-rv="${idx}">#${idx+1} · ${fmtT(e.s*it.step)} → ${fmtT(e.e*it.step)}<br><span class="mu">${e.ang?Math.round(e.ang)+'° กลับรถ':'ผ่านโซน A→B'}${tag}</span></div>`;
+      h+=`<div class="ev${sel}${st}" data-rv="${idx}">#${idx+1} · ${fmtMS(evS(it,e))} → ${fmtMS(evE(it,e))}<br><span class="mu">${e.ang?Math.round(e.ang)+'° กลับรถ':'ผ่านโซน A→B'}${tag}</span></div>`;
     }
   }
   $('evl').innerHTML=h||'<div class="empty">ยังไม่มีเหตุการณ์ให้ตรวจ — ประมวลผลวิดีโอก่อน</div>';
@@ -933,27 +975,33 @@ async function showRV(){
   if(running){$('info').textContent='กำลังประมวลผลอยู่ — กด Y/N ได้ ภาพจะแสดงเมื่อจบหรือหยุด';return}
   items.forEach(x=>{if(x!==it)releaseVid(x,'r')});
   const v=await ensureVid(it,'r');
-  const total=Math.max(0,Math.floor(v.duration/it.step)-1);
-  $('sl').min=Math.max(0,e.s-10);$('sl').max=Math.min(total,e.e+10);
+  const S0=evS(it,e),E0=evE(it,e);
+  const sl=$('sl');sl.step=RS;
+  sl.min=Math.floor(Math.max(0,S0-10)/RS)*RS;
+  sl.max=Math.max(+sl.min,Math.floor(Math.min(v.duration-0.05,E0+10)/RS)*RS);
   fillPlate(e);
-  await showFrame(e.s);
+  await showFrame(S0);
   drawPlate();
 }
-async function showFrame(i){
+async function showFrame(t){
   if(running)return;
   const tok=++showTok,it=curIt(),e=curEv();if(!it||!e)return;
-  fi=i;$('sl').value=i;
+  const lo=+$('sl').min,hi=+$('sl').max;
+  t=Math.min(Math.max(lo,Math.round(t/RS)*RS),hi);
+  fi=t;$('sl').value=t;
   try{
-    const v=await ensureVid(it,'r'),bmp=await getFrame(v,i*it.step);
+    const v=await ensureVid(it,'r'),bmp=await getFrame(v,t);
     if(tok!==showTok){bmp.close();return}
     vc.width=bmp.width;vc.height=bmp.height;vx.drawImage(bmp,0,0);
     vx.fillStyle='#3fb950';
     e.t.forEach(p=>{vx.beginPath();vx.arc(p.cx,p.cy,Math.max(4,bmp.width/200),0,7);vx.fill()});
-    const q=e.t.find(p=>p.i===i);
+    // กรอบรถแสดงเฉพาะเฟรมที่ตรวจไว้ตอนประมวลผล (ทุก step) ส่วนเฟรมระหว่างกลางไม่มีกรอบ
+    let q=null;for(const p of e.t)if(Math.abs(p.i*it.step-t)<=it.step/2+1e-6){q=p;break}
     if(q){vx.strokeStyle='#f5a524';vx.lineWidth=Math.max(3,bmp.width/250);vx.strokeRect(q.b.x1,q.b.y1,q.b.x2-q.b.x1,q.b.y2-q.b.y1)}
     bmp.close();
   }catch(err){$('info').textContent='ดึงภาพไม่ได้: '+err.message;return}
-  $('info').textContent=`${fmtT(i*it.step)}${i===e.s?' · จุดเริ่ม':''}${i===e.e?' · จุดจบ (เห็นทะเบียน)':''} — ${it.name}`;
+  const S0=evS(it,e),E0=evE(it,e);
+  $('info').textContent=`${fmtMS(t)}${Math.abs(t-S0)<RS/2?' · จุดเริ่ม':''}${Math.abs(t-E0)<RS/2?' · จุดจบ (เห็นทะเบียน)':''} — ${it.name}`;
 }
 async function drawPlate(){
   if(running)return;
@@ -961,7 +1009,7 @@ async function drawPlate(){
   const my=++plTok;
   let q=e.t[0];for(const p of e.t)if(Math.abs(p.i-e.e)<Math.abs(q.i-e.e))q=p;
   try{
-    const v=await ensureVid(it,'r'),bmp=await getFrame(v,e.e*it.step);
+    const v=await ensureVid(it,'r'),bmp=await getFrame(v,evE(it,e));
     if(my!==plTok){bmp.close();return}
     const b=q.b,m=0.08,w=b.x2-b.x1,h=b.y2-b.y1;
     const sx=Math.max(0,b.x1-w*m),sy=Math.max(0,b.y1-h*m);
@@ -1006,8 +1054,10 @@ function mark(v){
   if(flat.length&&next>=0){const [id,k]=flat[next];REV={id,k};renderReview();showRV()}
   else{REV={id:null,k:-1};renderReview();showRV()}
 }
-function setStart(){const e=curEv();if(!e)return;e.s=Math.min(fi,e.e);renderReview();showRV()}
-function setEnd(){const e=curEv();if(!e)return;e.e=Math.max(fi,e.s);renderReview();showRV()}
+function setStart(){const it=curIt(),e=curEv();if(!it||!e)return;
+  e.ts=Math.min(fi,evE(it,e));e.s=Math.round(e.ts/it.step);renderReview();showRV()}
+function setEnd(){const it=curIt(),e=curEv();if(!it||!e)return;
+  e.te=Math.max(fi,evS(it,e));e.e=Math.round(e.te/it.step);renderReview();showRV()}
 $('by').onclick=()=>mark(true);
 $('bn').onclick=()=>mark(false);
 $('bs').onclick=setStart;
@@ -1017,11 +1067,11 @@ $('sl').oninput=e=>showFrame(+e.target.value);
 document.addEventListener('keydown',e=>{
   if($('v-review').hidden)return;
   if(/INPUT|SELECT|TEXTAREA/.test(e.target.tagName)&&e.target.type!=='range')return;
-  const k=e.key;
+  const k=e.key,big=e.shiftKey?25:1; // Shift = ข้ามทีละ ~1 วินาที
   if(k==='y'||k==='Y')mark(true);
   else if(k==='n'||k==='N')mark(false);
-  else if(k==='ArrowRight'){e.preventDefault();showFrame(Math.min(+$('sl').max,fi+1))}
-  else if(k==='ArrowLeft'){e.preventDefault();showFrame(Math.max(+$('sl').min,fi-1))}
+  else if(k==='ArrowRight'){e.preventDefault();showFrame(fi+RS*big)}
+  else if(k==='ArrowLeft'){e.preventDefault();showFrame(fi-RS*big)}
   else if(k==='ArrowDown'||k==='ArrowUp'){
     e.preventDefault();
     const idx=flat.findIndex(([id,kk])=>id===REV.id&&kk===REV.k);
@@ -1069,29 +1119,35 @@ $('exp').onclick=async()=>{
   if(!list.length)return;
   let root;try{root=await showDirectoryPicker({mode:'readwrite'})}catch(err){return}
   const o=S();
-  const tag=t=>fmtT(t).replace(/:/g,'-')+'.'+String(Math.round(t*100)%100).padStart(2,'0');
+  // ชื่อไฟล์ตามเวลาจริงระดับมิลลิวินาที เช่น 00-07-17.240
+  const tag=t=>{
+    const ms=Math.round(t*1000);
+    const h=Math.floor(ms/3600000),m=Math.floor(ms%3600000/60000),s=Math.floor(ms%60000/1000),f=ms%1000;
+    return [h,m,s].map(pad).join('-')+'.'+String(f).padStart(3,'0');
+  };
   let csv='\ufeffหมวด,ไฟล์วิดีโอ,จุดเริ่ม,จุดจบ,มุมกลับรถ,ประเภทรถ,รหัสประเภท,หมวดทะเบียน,เลข,จังหวัด,โฟลเดอร์\n';
 
   // คำนวณจำนวนภาพทั้งหมดล่วงหน้า เพื่อแสดงเปอร์เซ็นให้ถูกต้อง
   const plans=[];
   for(const [it,e] of list){
     const v=await ensureVid(it,'r');
-    const last=Math.max(0,Math.floor(v.duration/it.step)-1);
-    const sT=e.s*it.step,eT=e.e*it.step;
+    const sT=evS(it,e),eT=evE(it,e);
     let shots=[];
     if(o.detail&&!o.all){
       const a=Math.max(0,sT-o.pre),b=Math.min(v.duration-0.05,eT+o.post);
       for(let t=a;t<=b+1e-6;t+=o.fine)shots.push({t:+t.toFixed(3),label:''});
       if(!shots.length)shots.push({t:eT,label:''});
     }else{
+      const last=Math.max(0,Math.floor(v.duration/it.step)-1);
+      const sIdx=Math.round(sT/it.step),eIdx=Math.round(eT/it.step);
       const pre=Math.round(o.pre/it.step),post=Math.round(o.post/it.step);
-      const before=Math.max(0,e.s-pre),mid=Math.round((e.s+e.e)/2);
+      const before=Math.max(0,sIdx-pre),mid=Math.round((sIdx+eIdx)/2);
       const idx=o.all
-        ? Array.from({length:Math.max(1,Math.min(last,e.e+post)-before+1)},(_,k)=>before+k)
-        : [...new Set([before,mid,e.e])];
+        ? Array.from({length:Math.max(1,Math.min(last,eIdx+post)-before+1)},(_,k)=>before+k)
+        : [...new Set([before,mid,eIdx])];
       shots=idx.map(i=>({
         t:i*it.step,
-        label:o.all?(i===e.e?'3_ทะเบียน_':''):(i===before?'1_ก่อนกระทำผิด_':i===e.e?'3_ทะเบียน_':i===mid?'2_ระหว่างกระทำผิด_':'')
+        label:o.all?(i===eIdx?'3_ทะเบียน_':''):(i===before?'1_ก่อนกระทำผิด_':i===eIdx?'3_ทะเบียน_':i===mid?'2_ระหว่างกระทำผิด_':'')
       }));
     }
     plans.push({it,e,v,shots});
@@ -1107,7 +1163,7 @@ $('exp').onclick=async()=>{
     const folderBase=`เหตุการณ์_${String(n+1).padStart(3,'0')}${plateTxt?'_'+safe(plateTxt):''}`;
     const folder=await uniqueName(cdir,folderBase,'','dir');
     const dir=await cdir.getDirectoryHandle(folder,{create:true});
-    const sT=e.s*it.step,eT=e.e*it.step;
+    const sT=evS(it,e),eT=evE(it,e);
 
     for(const {t,label} of shots){
       const bmp=await getFrame(v,t),c=document.createElement('canvas');
@@ -1120,7 +1176,7 @@ $('exp').onclick=async()=>{
       doneShots++;
       expUI.set(doneShots/totalShots,`เหตุการณ์ ${n+1}/${plans.length} · ${doneShots}/${totalShots} ภาพ · ${fn}`);
     }
-    csv+=[it.cat,it.name,fmtT(sT),fmtT(eT),e.ang?Math.round(e.ang):'A→B',p.t,VCODE[p.t]||'',p.f,p.n,p.v,folder].map(csvq).join(',')+'\n';
+    csv+=[it.cat,it.name,fmtMS(sT),fmtMS(eT),e.ang?Math.round(e.ang):'A→B',p.t,VCODE[p.t]||'',p.f,p.n,p.v,folder].map(csvq).join(',')+'\n';
   }
   const csvName=await uniqueName(root,'สรุป','.csv','file');
   const w=await(await root.getFileHandle(csvName,{create:true})).createWritable();
