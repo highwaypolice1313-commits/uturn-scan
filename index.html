@@ -1133,7 +1133,7 @@ $('exp').onclick=async()=>{
     const v=await ensureVid(it,'r');
     const sT=evS(it,e),eT=evE(it,e);
     let shots=[];
-    if(o.detail&&!o.all){
+    if(o.detail){
       // ปัดเวลาให้ตรงจังหวะเฟรม (RS) เหมือนตอนเลื่อนดู เพื่อให้ได้ภาพเหมือนกันทุกเฟรม
       const k0=Math.round(Math.max(0,sT-o.pre)/RS);
       const k1=Math.round(Math.min(v.duration-0.05,eT+o.post)/RS);
