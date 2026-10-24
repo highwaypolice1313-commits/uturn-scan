@@ -213,7 +213,7 @@ canvas{max-width:100%;display:block;background:#000;border-radius:8px}
         <div class="row">
           <label><input type="checkbox" id="exall"> ส่งออกทุกภาพในช่วง</label>
           <label><input type="checkbox" id="detail" checked> จับภาพละเอียดรอบเหตุการณ์</label>
-          <label>ทุก <input type="number" id="fine" value="0.25" step="0.01" min="0.04" style="width:64px"> วิ</label>
+          <label>ทุก <input type="number" id="fine" value="0.04" step="0.01" min="0.04" style="width:64px"> วิ</label>
           <button id="exp" class="pri" disabled>ส่งออกที่ยืนยันแล้ว</button>
           <span id="exs" class="mu"></span>
         </div>
@@ -334,7 +334,7 @@ const S=()=>{const step=Math.max(0.2,+$('step').value||0.5);return{
   minPts:3,
   hang:Math.max(1,Math.round(2/step)),   // หลังเห็นการเคลื่อนไหว ตรวจต่อ ~2 วิ
   live:$('lvon').checked,all:$('exall').checked,
-  detail:$('detail').checked,fine:Math.max(1,Math.round((+$('fine').value||0.25)/RS))*RS,
+  detail:$('detail').checked,fine:Math.max(1,Math.round((+$('fine').value||0.04)/RS))*RS,
   idleK:Math.max(1,Math.round((+$('idle').value||2)/step))
 }};
 
@@ -1100,6 +1100,17 @@ async function uniqueName(dir,base,ext,kind){
   return name;
 }
 
+// ---------- เวลาจริงตามนาฬิกาจากชื่อไฟล์ ----------
+// เช่น มะนาวหวาน_ch7_20261004090002_... + 7.14 วิ -> 09-07-14.000
+function clockTag(name,t){
+  const m=name.match(/(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})/);
+  if(!m){const ms=Math.round(t*1000);
+    return [Math.floor(ms/3600000),Math.floor(ms%3600000/60000),Math.floor(ms%60000/1000)].map(pad).join('-')+'.'+String(ms%1000).padStart(3,'0')}
+  const base=new Date(+m[1],+m[2]-1,+m[3],+m[4],+m[5],+m[6]);
+  const d=new Date(base.getTime()+Math.round(t*1000));
+  return `${pad(d.getHours())}-${pad(d.getMinutes())}-${pad(d.getSeconds())}.${String(d.getMilliseconds()).padStart(3,'0')}`;
+}
+
 // ---------- Modal ส่งออก ----------
 const expUI={
   open(){$('expModal').hidden=false;$('expClose').hidden=true;this.set(0,'เตรียมส่งออก…')},
@@ -1117,24 +1128,18 @@ const expUI={
 $('exp').onclick=async()=>{
   const list=[];for(const it of items)for(const e of it.events)if(e.ok===true)list.push([it,e]);
   if(!list.length)return;
-  let root;try{root=await showDirectoryPicker({mode:'readwrite'})}catch(err){return}
+  let root;try{root=await showDirectoryPicker({mode:'readwrite',id:'uturn-out'})}catch(err){return}
   const o=S();
-  // ชื่อไฟล์ตามเวลาจริงระดับมิลลิวินาที เช่น 00-07-17.240
-  const tag=t=>{
-    const ms=Math.round(t*1000);
-    const h=Math.floor(ms/3600000),m=Math.floor(ms%3600000/60000),s=Math.floor(ms%60000/1000),f=ms%1000;
-    return [h,m,s].map(pad).join('-')+'.'+String(f).padStart(3,'0');
-  };
   let csv='\ufeffหมวด,ไฟล์วิดีโอ,จุดเริ่ม,จุดจบ,มุมกลับรถ,ประเภทรถ,รหัสประเภท,หมวดทะเบียน,เลข,จังหวัด,โฟลเดอร์\n';
 
-  // คำนวณจำนวนภาพทั้งหมดล่วงหน้า เพื่อแสดงเปอร์เซ็นให้ถูกต้อง
+  // คำนวณรายการภาพล่วงหน้า เพื่อแสดงเปอร์เซ็นให้ถูกต้อง
   const plans=[];
   for(const [it,e] of list){
     const v=await ensureVid(it,'r');
     const sT=evS(it,e),eT=evE(it,e);
     let shots=[];
     if(o.detail){
-      // ปัดเวลาให้ตรงจังหวะเฟรม (RS) เหมือนตอนเลื่อนดู เพื่อให้ได้ภาพเหมือนกันทุกเฟรม
+      // ปัดเวลาให้ตรงจังหวะเฟรม (RS) เหมือนตอนเลื่อนดู
       const k0=Math.round(Math.max(0,sT-o.pre)/RS);
       const k1=Math.round(Math.min(v.duration-0.05,eT+o.post)/RS);
       const kStep=Math.max(1,Math.round(o.fine/RS));
@@ -1159,22 +1164,26 @@ $('exp').onclick=async()=>{
   let doneShots=0;
 
   expUI.open();
+  const vidDirs=new Map(); // โฟลเดอร์ต่อวิดีโอ หนึ่งวิดีโอใช้โฟลเดอร์เดียว
+  const cv=document.createElement('canvas'),cx=cv.getContext('2d');
+
   for(let n=0;n<plans.length;n++){
     const {it,e,v,shots}=plans[n],p=e.plate;
     const cdir=await root.getDirectoryHandle(safe(it.cat),{create:true});
+    if(!vidDirs.has(it.id)){
+      const vn=await uniqueName(cdir,safe(it.name.replace(/\.[^.]+$/,'')),'','dir');
+      vidDirs.set(it.id,await cdir.getDirectoryHandle(vn,{create:true}));
+    }
+    const dir=vidDirs.get(it.id),folder=dir.name;
     const plateTxt=[p.f&&p.n?p.f+p.n:(p.f||p.n),p.v].filter(Boolean).join('-');
-    const folderBase=`เหตุการณ์_${String(n+1).padStart(3,'0')}${plateTxt?'_'+safe(plateTxt):''}`;
-    const folder=await uniqueName(cdir,folderBase,'','dir');
-    const dir=await cdir.getDirectoryHandle(folder,{create:true});
+    const evLabel=`เหตุการณ์${String(n+1).padStart(3,'0')}${plateTxt?'_'+safe(plateTxt):''}`;
     const sT=evS(it,e),eT=evE(it,e);
 
-    // โฟลเดอร์เหตุการณ์เป็นโฟลเดอร์ใหม่และเวลาแต่ละภาพไม่ซ้ำ จึงไม่ต้องเช็กชื่อซ้ำทุกภาพ
-    const cv=document.createElement('canvas');const cx=cv.getContext('2d');
     for(const {t,label} of shots){
       const bmp=await getFrame(v,t);
       cv.width=bmp.width;cv.height=bmp.height;cx.drawImage(bmp,0,0);bmp.close();
       const blob=await new Promise(r=>cv.toBlob(r,'image/jpeg',o.detail?0.95:0.93));
-      const fn=label+safe(it.name.replace(/\.[^.]+$/,''))+'_'+tag(t)+'.jpg';
+      const fn=`${evLabel}_${label}${clockTag(it.name,t)}.jpg`;
       const fh=await dir.getFileHandle(fn,{create:true}),w=await fh.createWritable();
       await w.write(blob);await w.close();
       doneShots++;
