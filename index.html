@@ -52,6 +52,8 @@ input[type=number]{width:76px}
 .st.done{background:#11261a;color:var(--ok)}
 .st.err{background:#2a1214;color:var(--no)}
 canvas{max-width:100%;display:block;background:#000;border-radius:8px}
+#vc{max-width:100%;max-height:calc(100vh - 260px);width:auto;height:auto;object-fit:contain}
+.rv{grid-template-columns:300px minmax(0,1fr)}  
 #zc{cursor:crosshair}
 #evth{display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;margin-top:10px}
 .th{flex:0 0 150px;font-size:11px;color:var(--mu)}
@@ -77,6 +79,14 @@ canvas{max-width:100%;display:block;background:#000;border-radius:8px}
   .qi{grid-template-columns:1fr 1fr}
   .orow{grid-template-columns:1fr}
 }
+  .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:50}
+.modal-bg[hidden]{display:none}
+.modal{background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);padding:22px 24px;width:min(420px,90vw)}
+.modal h2{font-size:16px;margin:0 0 6px}
+.modal .bar.big{margin:14px 0 8px}
+.modal .pct{font-size:28px;font-weight:600;color:var(--ac);text-align:center;margin:4px 0}
+.modal .det{font-size:13px;color:var(--mu);min-height:18px;word-break:break-all}
+.modal .btns{display:flex;justify-content:flex-end;margin-top:14px}
 </style>
 </head>
 <body>
@@ -1029,6 +1039,18 @@ async function uniqueName(dir,base,ext,kind){
   while(await nameExists(dir,name,kind))name=`${base}_${n++}${ext}`;
   return name;
 }
+const expUI={
+  open(){$('expModal').hidden=false;$('expClose').hidden=true;this.set(0,'เตรียมส่งออก…')},
+  set(f,det){
+    const p=Math.max(0,Math.min(1,f));
+    $('expPct').textContent=Math.floor(p*100)+'%';
+    $('expBar').style.width=(p*100)+'%';
+    if(det!==undefined)$('expDet').textContent=det;
+  },
+  done(msg){this.set(1,msg);$('expClose').hidden=false},
+  close(){$('expModal').hidden=true}
+};
+$('expClose').onclick=()=>expUI.close();  
 
 // ---------- ส่งออก ----------
 $('exp').onclick=async()=>{
@@ -1038,26 +1060,17 @@ $('exp').onclick=async()=>{
   const o=S();
   const tag=t=>fmtT(t).replace(/:/g,'-')+'.'+String(Math.round(t*100)%100).padStart(2,'0');
   let csv='\ufeffหมวด,ไฟล์วิดีโอ,จุดเริ่ม,จุดจบ,มุมกลับรถ,ประเภทรถ,รหัสประเภท,หมวดทะเบียน,เลข,จังหวัด,โฟลเดอร์\n';
-  for(let n=0;n<list.length;n++){
-    const [it,e]=list[n],p=e.plate;
-    $('exs').textContent=`ส่งออก ${n+1}/${list.length}…`;
-    const cdir=await root.getDirectoryHandle(safe(it.cat),{create:true});
-    const plateTxt=[p.f&&p.n?p.f+p.n:(p.f||p.n),p.v].filter(Boolean).join('-');
-    const folderBase=`เหตุการณ์_${String(n+1).padStart(3,'0')}${plateTxt?'_'+safe(plateTxt):''}`;
-    const folder=await uniqueName(cdir,folderBase,'','dir');
-    const dir=await cdir.getDirectoryHandle(folder,{create:true});
+
+  // คำนวณจำนวนภาพทั้งหมดล่วงหน้า เพื่อแสดงเปอร์เซ็นให้ถูกต้อง
+  const plans=[];
+  for(const [it,e] of list){
     const v=await ensureVid(it,'r');
     const last=Math.max(0,Math.floor(v.duration/it.step)-1);
     const sT=e.s*it.step,eT=e.e*it.step;
-
-    // รายการภาพที่จะส่งออก: {t: วินาที, label: คำนำหน้าชื่อไฟล์}
-    // โหมดละเอียด: ส่งออกทุกเฟรมตลอดช่วงกระทำผิด (รวมเผื่อก่อน/หลัง) ไม่มีป้ายแยก ไม่คัดเลือก
     let shots=[];
     if(o.detail&&!o.all){
       const a=Math.max(0,sT-o.pre),b=Math.min(v.duration-0.05,eT+o.post);
-      for(let t=a;t<=b+1e-6;t+=o.fine){
-        shots.push({t:+t.toFixed(3),label:''});
-      }
+      for(let t=a;t<=b+1e-6;t+=o.fine)shots.push({t:+t.toFixed(3),label:''});
       if(!shots.length)shots.push({t:eT,label:''});
     }else{
       const pre=Math.round(o.pre/it.step),post=Math.round(o.post/it.step);
@@ -1070,6 +1083,20 @@ $('exp').onclick=async()=>{
         label:o.all?(i===e.e?'3_ทะเบียน_':''):(i===before?'1_ก่อนกระทำผิด_':i===e.e?'3_ทะเบียน_':i===mid?'2_ระหว่างกระทำผิด_':'')
       }));
     }
+    plans.push({it,e,v,shots});
+  }
+  const totalShots=plans.reduce((a,p)=>a+p.shots.length,0);
+  let doneShots=0;
+
+  expUI.open();
+  for(let n=0;n<plans.length;n++){
+    const {it,e,v,shots}=plans[n],p=e.plate;
+    const cdir=await root.getDirectoryHandle(safe(it.cat),{create:true});
+    const plateTxt=[p.f&&p.n?p.f+p.n:(p.f||p.n),p.v].filter(Boolean).join('-');
+    const folderBase=`เหตุการณ์_${String(n+1).padStart(3,'0')}${plateTxt?'_'+safe(plateTxt):''}`;
+    const folder=await uniqueName(cdir,folderBase,'','dir');
+    const dir=await cdir.getDirectoryHandle(folder,{create:true});
+    const sT=e.s*it.step,eT=e.e*it.step;
 
     for(const {t,label} of shots){
       const bmp=await getFrame(v,t),c=document.createElement('canvas');
@@ -1079,13 +1106,16 @@ $('exp').onclick=async()=>{
       const fn=await uniqueName(dir,base,'.jpg','file');
       const fh=await dir.getFileHandle(fn,{create:true}),w=await fh.createWritable();
       await w.write(blob);await w.close();
+      doneShots++;
+      expUI.set(doneShots/totalShots,`เหตุการณ์ ${n+1}/${plans.length} · ${doneShots}/${totalShots} ภาพ · ${fn}`);
     }
     csv+=[it.cat,it.name,fmtT(sT),fmtT(eT),e.ang?Math.round(e.ang):'A→B',p.t,VCODE[p.t]||'',p.f,p.n,p.v,folder].map(csvq).join(',')+'\n';
   }
   const csvName=await uniqueName(root,'สรุป','.csv','file');
   const w=await(await root.getFileHandle(csvName,{create:true})).createWritable();
   await w.write(csv);await w.close();
-  $('exs').textContent=`เสร็จแล้ว ${list.length} เหตุการณ์ → ${root.name} (ไฟล์สรุป: ${csvName})`;
+  $('exs').textContent=`เสร็จแล้ว ${list.length} เหตุการณ์ → ${root.name}`;
+  expUI.done(`เสร็จแล้ว ${totalShots} ภาพ · ${list.length} เหตุการณ์ · ไฟล์สรุป: ${csvName}`);
 };
 
 // ---------- เริ่มทำงาน ----------
@@ -1100,5 +1130,14 @@ fetch('yolov8n.onnx').then(r=>r.ok?r.arrayBuffer():Promise.reject()).then(loadMo
 fetch('vehicle-cls.onnx').then(r=>r.ok?r.arrayBuffer():Promise.reject()).then(loadClsModel)
   .catch(()=>{$('autoinfo').textContent='ยังไม่มีโมเดลประเภทรถ กดปุ่ม "โมเดลประเภทรถ" เพื่อเลือกไฟล์ หรือเลือกประเภทเอง'});
 </script>
+<div id="expModal" class="modal-bg" hidden>
+  <div class="modal">
+    <h2>กำลังส่งออกภาพ</h2>
+    <div id="expPct" class="pct">0%</div>
+    <div class="bar big"><i id="expBar"></i></div>
+    <div id="expDet" class="det"></div>
+    <div class="btns"><button id="expClose" hidden>ปิด</button></div>
+  </div>
+</div>  
 </body>
 </html>
