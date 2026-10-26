@@ -150,13 +150,13 @@ canvas{max-width:100%;display:block;background:#000;border-radius:8px}
       <h2>ตั้งค่าการตรวจ <span class="mu">(ระบบจำค่าไว้ให้อัตโนมัติ)</span></h2>
       <div class="row">
         <label>คุณภาพภาพ
-  <select id="qual">
-    <option value="0.75" selected>ประหยัดไฟล์ (0.75) · ชัดพอสำหรับทะเบียน</option>
-    <option value="0.80">ประหยัด (0.80)</option>
-    <option value="0.90">มาตรฐาน (0.90)</option>
-    <option value="0.95">คมชัดสูงสุด (0.95)</option>
-  </select>
-</label>
+          <select id="qual">
+            <option value="0.75" selected>ประหยัดไฟล์ (0.75) · ชัดพอสำหรับทะเบียน</option>
+            <option value="0.80">ประหยัด (0.80)</option>
+            <option value="0.90">มาตรฐาน (0.90)</option>
+            <option value="0.95">คมชัดสูงสุด (0.95)</option>
+          </select>
+        </label>
         <label>ตรวจหยาบ (หาว่ามีรถ) ทุก <input type="number" id="idle" value="1" step="0.5" min="0.5"> วิ</label>
         <label>ตรวจละเอียด (เฉพาะช่วงที่มีรถ) ทุก <input type="number" id="step" value="0.2" step="0.1" min="0.1"> วิ</label>
         <label>ความมั่นใจ <input type="number" id="conf" value="0.35" step="0.05" min="0.1" max="0.9"></label>
@@ -177,8 +177,8 @@ canvas{max-width:100%;display:block;background:#000;border-radius:8px}
           <button id="pause" disabled>พัก</button>
           <button id="stop" class="dng" disabled>หยุด</button>
           <button id="saveSess">บันทึกผลการตรวจ</button>
-<button id="loadSess">โหลดผลที่บันทึกไว้</button>
-<input type="file" id="sf" accept=".json,.uturn.json" hidden>
+          <button id="loadSess">โหลดผลที่บันทึกไว้</button>
+          <input type="file" id="sf" accept=".json,.uturn.json" hidden>
         </div>
       </div>
       <div class="bar big"><i id="ovBar"></i></div>
@@ -230,6 +230,7 @@ canvas{max-width:100%;display:block;background:#000;border-radius:8px}
           <label><input type="checkbox" id="exall"> ส่งออกทุกภาพในช่วง</label>
           <label><input type="checkbox" id="detail" checked> จับภาพละเอียดรอบเหตุการณ์</label>
           <label>ทุก <input type="number" id="fine" value="0.04" step="0.01" min="0.04" style="width:64px"> วิ</label>
+          <label><input type="checkbox" id="bestPlate"> ภาพเดียวที่ทะเบียนชัดที่สุดต่อเหตุการณ์</label>
           <label><input type="checkbox" id="incN"> รวมที่กด N (แยกโฟลเดอร์ "ไม่ใช่")</label>
           <button id="exp" class="pri" disabled>ส่งออกที่ยืนยันแล้ว</button>
           <span id="exs" class="mu"></span>
@@ -390,8 +391,8 @@ const poly=(c,z,w,h)=>{c.beginPath();z.forEach(([x,y],i)=>i?c.lineTo(x*w,y*h):c.
 const S=()=>{
   const step=Math.max(0.1,+$('step').value||0.2);
   return{
-    step,                                       // ตรวจละเอียด (เฉพาะช่วงที่มีรถ)
-    coarse:Math.max(0.5,+$('idle').value||1),   // ตรวจหยาบ (หาว่ามีรถเมื่อไหร่)
+    step,
+    coarse:Math.max(0.5,+$('idle').value||1),
     conf:+$('conf').value||0.35,
     mot:(+$('mot').value||4)/1000,
     ang:+$('ang').value||120,
@@ -405,13 +406,13 @@ const S=()=>{
 // ---------- การจำค่า ----------
 function loadSet(){
   const s=JSON.parse(localStorage.uSet||'{}');
-  SET_IDS.forEach(id=>{if(s[id]===undefined)return;const el=$(id);if(el.type==='checkbox')el.checked=s[id];else el.value=s[id]});
+  SET_IDS.forEach(id=>{if(s[id]===undefined)return;const el=$(id);if(!el)return;if(el.type==='checkbox')el.checked=s[id];else el.value=s[id]});
 }
 function saveSet(){
-  const s={};SET_IDS.forEach(id=>{const el=$(id);s[id]=el.type==='checkbox'?el.checked:el.value});
+  const s={};SET_IDS.forEach(id=>{const el=$(id);if(!el)return;s[id]=el.type==='checkbox'?el.checked:el.value});
   localStorage.uSet=JSON.stringify(s);
 }
-SET_IDS.forEach(id=>$(id).addEventListener('change',saveSet));
+SET_IDS.forEach(id=>{const el=$(id);if(el)el.addEventListener('change',saveSet)});
 
 // canvas ทำงานเบื้องหลัง
 const dctx=document.createElement('canvas').getContext('2d',{willReadFrequently:true});
@@ -452,11 +453,15 @@ function touchOpen(it,key){
   const i=openOrder.indexOf(id);if(i>=0)openOrder.splice(i,1);
   openOrder.push(id);
   while(openOrder.length>OPEN_MAX){
-    const old=openOrder.shift();
-    const [oid,okey]=old.split(':');
+    const [oid,okey]=openOrder.shift().split(':');
     const other=items.find(x=>String(x.id)===oid);
     if(other&&other!==it)releaseVid(other,okey);
   }
+}
+function releaseVid(it,key){
+  const v=it[key];if(!v)return;
+  try{v.pause();v.removeAttribute('src');v.load()}catch(e){}
+  it[key]=null;
 }
 function ensureVid(it,key){
   if(it[key])return Promise.resolve(it[key]);
@@ -477,11 +482,6 @@ function ensureVid(it,key){
     releaseVid(it,key);
     return attempt();
   });
-}
-function releaseVid(it,key){
-  const v=it[key];if(!v)return;
-  try{v.pause();v.removeAttribute('src');v.load()}catch(e){}
-  it[key]=null;
 }
 function seek(v,t){return new Promise((r,j)=>{
   if(!Number.isFinite(t))return j(new Error('เวลาเฟรมไม่ถูกต้อง (ค่า '+t+')'));
@@ -899,7 +899,7 @@ async function processItem(it){
         report();
         await new Promise(r=>setTimeout(r,0));
       }
-      if(R.wt<=w.b)return pauseItem(it,R,t0); // หยุดกลางช่วง
+      if(R.wt<=w.b)return pauseItem(it,R,t0);
       closeStale(C,0,true);
       R.wi++;R.wt=null;
     }
@@ -947,6 +947,7 @@ async function runQueue(cat){
   $('pause').textContent='พัก';$('stop').textContent='หยุด';
   renderAll();
 }
+
 // ---------- บันทึก / โหลดผลการประมวลผล ----------
 function serializeSession(){
   const vids=items.filter(i=>i.status==='done').map(it=>({
@@ -954,13 +955,12 @@ function serializeSession(){
     cat:it.cat,step:it.step,dur:it.dur,
     events:it.events.map(e=>({
       ts:e.ts,te:e.te,ang:e.ang,ok:e.ok,plate:e.plate,auto:e.auto,
-      // เก็บเส้นทางการติดตามเพื่อแสดงกรอบและหาเฟรมป้าย
       pts:e.pts.map(p=>({t:p.t,cx:p.cx,cy:p.cy,b:p.b,s:p.s}))
     }))
   }));
   return{
     v:1,savedAt:new Date().toISOString(),
-    settings:Object.fromEntries(SET_IDS.map(id=>{const el=$(id);return[id,el.type==='checkbox'?el.checked:el.value]})),
+    settings:Object.fromEntries(SET_IDS.map(id=>{const el=$(id);return[id,!el?null:el.type==='checkbox'?el.checked:el.value]})),
     cats,zones:zonesAll,videos:vids
   };
 }
@@ -985,7 +985,6 @@ $('sf').onchange=async e=>{
   const f=e.target.files[0];e.target.value='';if(!f)return;
   let data;try{data=JSON.parse(await f.text())}catch(err){return msg('ไฟล์นี้ไม่ใช่ผลการตรวจที่บันทึกไว้')}
   if(!data||data.v!==1||!Array.isArray(data.videos))return msg('รูปแบบไฟล์ไม่ถูกต้อง');
-  // ให้ผู้ใช้เลือกวิดีโอจริงเพื่อจับคู่กับผลที่บันทึก
   const vf=await pickVideosFor(data.videos);
   if(!vf)return;
   let matched=0,missing=[];
@@ -1002,7 +1001,6 @@ $('sf').onchange=async e=>{
   renderAll();
   msg(`โหลดสำเร็จ ${matched} วิดีโอ`+(missing.length?`\n\nไม่พบไฟล์ต่อไปนี้ จึงยังไม่ได้โหลด:\n${missing.join('\n')}`:''),'โหลดผลสำเร็จ');
 };
-// ให้เลือกไฟล์วิดีโอที่ต้องการจับคู่ (ทีละหลายไฟล์ได้)
 function pickVideosFor(records){
   return new Promise(res=>{
     const inp=document.createElement('input');inp.type='file';inp.multiple=true;
@@ -1012,7 +1010,7 @@ function pickVideosFor(records){
     msg(`ระบบจะจับคู่กับวิดีโอ ${records.length} ไฟล์\nกรุณาเลือกไฟล์วิดีโอเดิมทั้งหมดในหน้าถัดไป`,'เลือกวิดีโอ').then(()=>inp.click());
   });
 }
-  
+
 $('runAll').onclick=()=>{if(!items.some(i=>i.resume))$('evth').innerHTML='';refreshLiveBox();runQueue(null)};
 $('runCat').onclick=()=>{if(!items.some(i=>i.resume))$('evth').innerHTML='';refreshLiveBox();runQueue(filterCat)};
 $('pause').onclick=()=>{hardStop=false;stopF=true;$('pause').textContent='กำลังพัก…'};
@@ -1207,7 +1205,6 @@ async function showRV(){
   await showFrame(e.ts);
   drawPlate();
 }
-// แสดงป้ายทะเบียน/ประเภท/สถานะบนภาพตัวอย่าง
 function drawBadge(e,w){
   const p=e.plate;
   const plateTxt=[p.f&&p.n?p.f+p.n:(p.f||p.n),p.v].filter(Boolean).join(' ');
@@ -1319,7 +1316,7 @@ $('sl').oninput=e=>showFrame(+e.target.value);
 document.addEventListener('keydown',e=>{
   if($('v-review').hidden||!$('dlg').hidden)return;
   if(/INPUT|SELECT|TEXTAREA/.test(e.target.tagName)&&e.target.type!=='range')return;
-  const k=e.key,big=e.shiftKey?25:1; // Shift = ข้ามทีละ ~1 วินาที
+  const k=e.key,big=e.shiftKey?25:1;
   if((e.ctrlKey||e.metaKey)&&(k==='z'||k==='Z')){e.preventDefault();undo();return}
   if(k==='y'||k==='Y')mark(true);
   else if(k==='n'||k==='N')mark(false);
@@ -1346,7 +1343,6 @@ async function nameExists(dir,name,kind){
     throw e;
   }
 }
-// คืนชื่อที่ยังไม่ซ้ำ เช่น "a.jpg" -> "a_2.jpg" -> "a_3.jpg"
 async function uniqueName(dir,base,ext,kind){
   let name=base+ext,n=2;
   while(await nameExists(dir,name,kind))name=`${base}_${n++}${ext}`;
@@ -1354,7 +1350,6 @@ async function uniqueName(dir,base,ext,kind){
 }
 
 // ---------- เวลาจริงตามนาฬิกาจากชื่อไฟล์ ----------
-// เช่น มะนาวหวาน_ch7_20261004090002_... + 7.14 วิ -> 09-07-14.000
 function clockTag(name,t){
   const m=name.match(/(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})/);
   if(!m){const ms=Math.round(t*1000);
@@ -1378,7 +1373,6 @@ const expUI={
 };
 
 // ---------- ส่งออก ----------
-// ช่วงภาพแบบเป็นจังหวะเฟรม เพื่อให้ได้ภาพตรงกับตอนเลื่อนดู
 function rangeShots(a,b,step,label=''){
   const out=[],k0=Math.round(a/RS),k1=Math.round(b/RS),ks=Math.max(1,Math.round(step/RS));
   for(let k=k0;k<=k1;k+=ks)out.push({t:+(k*RS).toFixed(3),label});
@@ -1395,7 +1389,41 @@ function makeShots(e,v,o){
     {t:+Math.min(end,e.te).toFixed(3),label:'3_ทะเบียน_'}
   ];
 }
-// ดึงเฟรมแล้วแปลงเป็น JPEG
+// ทะเบียนชัดที่สุด: วัดความชัดเฉพาะบริเวณป้าย (ไม่รวมตัวรถ)
+function plateScore(bmp,b){
+  const pb=plateBox(b);
+  const x=Math.max(0,Math.floor(pb.x1)),y=Math.max(0,Math.floor(pb.y1));
+  const w=Math.min(bmp.width-x,Math.ceil(pb.x2-pb.x1)),h=Math.min(bmp.height-y,Math.ceil(pb.y2-pb.y1));
+  if(w<8||h<4)return -1;
+  const W=Math.min(w,240),H=Math.max(4,Math.round(h*W/w));
+  sc2.width=W;sc2.height=H;shx.drawImage(bmp,x,y,w,h,0,0,W,H);
+  const d=shx.getImageData(0,0,W,H).data,g=new Float32Array(W*H);
+  for(let i=0;i<g.length;i++)g[i]=.3*d[i*4]+.59*d[i*4+1]+.11*d[i*4+2];
+  let s=0,s2=0,n=0;
+  for(let yy=1;yy<H-1;yy++)for(let xx=1;xx<W-1;xx++){
+    const i=yy*W+xx,l=4*g[i]-g[i-1]-g[i+1]-g[i-W]-g[i+W];s+=l;s2+=l*l;n++;
+  }
+  return n?s2/n-(s/n)**2:0;
+}
+// หาเวลาที่ป้ายชัดที่สุดในช่วงเหตุการณ์
+async function bestPlateTime(it,e,v,o){
+  const end=v.duration-0.05;
+  const a=Math.max(0,e.ts-o.pre),b=Math.min(end,e.te+o.post);
+  const kStep=Math.max(1,Math.round(Math.max(0.08,o.fine)/RS));
+  const tol=Math.max(0.6,it.step*2);
+  let best=null,bestS=-1;
+  for(let k=Math.round(a/RS);k<=Math.round(b/RS);k+=kStep){
+    const t=+(k*RS).toFixed(3);
+    const q=nearPt(e.pts,t);
+    if(Math.abs(q.t-t)>tol)continue;
+    let bmp=null;
+    try{bmp=await getFrame(v,t)}catch(err){continue}
+    const s=plateScore(bmp,q.b);
+    bmp.close();
+    if(s>bestS){bestS=s;best=t}
+  }
+  return best;
+}
 async function prepBlob(v,t,q){
   const bmp=await getFrame(v,t),cv=document.createElement('canvas');
   cv.width=bmp.width;cv.height=bmp.height;cv.getContext('2d').drawImage(bmp,0,0);bmp.close();
@@ -1405,31 +1433,34 @@ async function writeBlob(dir,fn,blob){
   const fh=await dir.getFileHandle(fn,{create:true}),w=await fh.createWritable();
   await w.write(blob);await w.close();
 }
-// ส่งออกรายการเหตุการณ์ (ใช้ได้ทั้งส่งออกทั้งหมดและส่งออกเหตุการณ์เดียว)
 async function exportEvents(list){
   let root;try{root=await showDirectoryPicker({mode:'readwrite',id:'uturn-out'})}catch(err){return}
-  const o=S(),q=parseFloat($('qual').value)||0.9;
+  const o=S(),q=parseFloat($('qual').value)||0.9,bestMode=$('bestPlate').checked;
   const plans=[];
   for(const [it,e] of list){
     const v=await ensureVid(it,'r');
-    plans.push({it,e,v,shots:makeShots(e,v,o)});
+    plans.push({it,e,v,shots:bestMode?null:makeShots(e,v,o)});
   }
-  const totalShots=plans.reduce((a,p)=>a+p.shots.length,0);
 
-    const bad=plans.filter(p=>!Number.isFinite(p.e.ts)||!Number.isFinite(p.e.te));
+  // ข้ามเหตุการณ์ที่ค่าเวลาไม่สมบูรณ์
+  const bad=plans.filter(p=>!Number.isFinite(p.e.ts)||!Number.isFinite(p.e.te));
   if(bad.length){
     const ok=await confirmD(`มี ${bad.length} เหตุการณ์ที่ค่าเวลาไม่สมบูรณ์ ระบบจะข้ามรายการเหล่านี้\n\nกด "ยืนยัน" เพื่อส่งออกส่วนที่เหลือ`,'ข้ามรายการที่ผิด');
     if(!ok)return;
     for(const b of bad)plans.splice(plans.indexOf(b),1);
   }
-  
-  // ประมาณขนาดจากภาพตัวอย่าง 1 ภาพ แล้วเตือนถ้าใหญ่เกิน 500 MB
-  let estBytes=0;
-  try{const sb=await prepBlob(plans[0].v,plans[0].shots[0].t,q);estBytes=sb.size*totalShots}
-  catch(err){console.warn('estimate',err)}
-  if(estBytes>500e6){
-    const ok=await confirmD(`จะส่งออก ${totalShots} ภาพ ใช้พื้นที่ประมาณ ${fmtBytes(estBytes)}\n\nเบราว์เซอร์อ่านพื้นที่ว่างของดิสก์ไม่ได้ กรุณาตรวจว่าปลายทางมีพื้นที่พอก่อนดำเนินการต่อ`,'ตรวจพื้นที่ก่อนส่งออก');
-    if(!ok)return;
+  if(!plans.length)return;
+
+  const totalShots=bestMode?plans.length:plans.reduce((a,p)=>a+p.shots.length,0);
+
+  if(!bestMode){
+    let estBytes=0;
+    try{const sb=await prepBlob(plans[0].v,plans[0].shots[0].t,q);estBytes=sb.size*totalShots}
+    catch(err){console.warn('estimate',err)}
+    if(estBytes>500e6){
+      const ok=await confirmD(`จะส่งออก ${totalShots} ภาพ ใช้พื้นที่ประมาณ ${fmtBytes(estBytes)}\n\nเบราว์เซอร์อ่านพื้นที่ว่างของดิสก์ไม่ได้ กรุณาตรวจว่าปลายทางมีพื้นที่พอก่อนดำเนินการต่อ`,'ตรวจพื้นที่ก่อนส่งออก');
+      if(!ok)return;
+    }
   }
 
   expUI.open();
@@ -1437,8 +1468,8 @@ async function exportEvents(list){
   let csv='\ufeffหมวด,ไฟล์วิดีโอ,จุดเริ่ม,จุดจบ,มุมกลับรถ,ประเภทรถ,รหัสประเภท,หมวดทะเบียน,เลข,จังหวัด,ผลตรวจ,โฟลเดอร์\n';
   let done=0,csvName='';
   try{
-    for(const {it,e,v,shots} of plans){
-      const p=e.plate;
+    for(let n=0;n<plans.length;n++){
+      const {it,e,v}=plans[n],p=e.plate;
       const cdir0=await root.getDirectoryHandle(safe(it.cat),{create:true});
       const cdir=e.ok===false?await cdir0.getDirectoryHandle('ไม่ใช่',{create:true}):cdir0;
       if(!vidDirs.has(it.id)){
@@ -1451,7 +1482,13 @@ async function exportEvents(list){
       const evLabel=`เหตุการณ์${String(no).padStart(3,'0')}${plateTxt?'_'+safe(plateTxt):''}`;
       const evDir=await vidDir.getDirectoryHandle(await uniqueName(vidDir,evLabel,'','dir'),{create:true});
 
-      // ดึงภาพถัดไปพร้อมกับการเขียนไฟล์ภาพปัจจุบัน (pipeline)
+      let shots=plans[n].shots;
+      if(bestMode){
+        expUI.set(done/totalShots,`${evLabel} · กำลังหาภาพที่ทะเบียนชัดที่สุด…`);
+        const bt=await bestPlateTime(it,e,v,o);
+        shots=[{t:+(bt!=null?bt:e.te).toFixed(3),label:'ป้ายชัด_'}];
+      }
+
       let pend=prepBlob(v,shots[0].t,q);
       for(let k=0;k<shots.length;k++){
         const sh=shots[k];
@@ -1460,9 +1497,10 @@ async function exportEvents(list){
         const fn=`${evLabel}_${sh.label}${clockTag(it.name,sh.t)}.jpg`;
         await writeBlob(evDir,fn,blob);
         done++;
-        expUI.set(done/totalShots,`${evLabel} · ${done}/${totalShots} ภาพ · ${fn}`);
+        expUI.set(done/totalShots,`${evLabel} · ${done}/${totalShots} · ${fn}`);
       }
-      csv+=[it.cat,it.name,fmtMS(e.ts),fmtMS(e.te),e.ang?Math.round(e.ang):'A→B',p.t,VCODE[p.t]||'',p.f,p.n,p.v,e.ok===false?'ไม่ใช่':'ใช่',`${cdir.name}/${vidDir.name}/${evDir.name}`].map(csvq).join(',')+'\n';    }
+      csv+=[it.cat,it.name,fmtMS(e.ts),fmtMS(e.te),e.ang?Math.round(e.ang):'A→B',p.t,VCODE[p.t]||'',p.f,p.n,p.v,e.ok===false?'ไม่ใช่':'ใช่',`${cdir.name}/${vidDir.name}/${evDir.name}`].map(csvq).join(',')+'\n';
+    }
     csvName=await uniqueName(root,'สรุป','.csv','file');
     await writeBlob(root,csvName,new Blob([csv],{type:'text/csv'}));
     $('exs').textContent=`เสร็จแล้ว ${plans.length} เหตุการณ์ → ${root.name}`;
