@@ -176,6 +176,9 @@ canvas{max-width:100%;display:block;background:#000;border-radius:8px}
           <button id="runAll" class="pri">เริ่มทั้งหมด</button>
           <button id="pause" disabled>พัก</button>
           <button id="stop" class="dng" disabled>หยุด</button>
+          <button id="saveSess">บันทึกผลการตรวจ</button>
+<button id="loadSess">โหลดผลที่บันทึกไว้</button>
+<input type="file" id="sf" accept=".json,.uturn.json" hidden>
         </div>
       </div>
       <div class="bar big"><i id="ovBar"></i></div>
@@ -440,21 +443,36 @@ $('cf').onchange=async e=>{const f=e.target.files[0];if(f)await loadClsModel(awa
 // ---------- วิดีโอ & เฟรม ----------
 // key 'p' = ใช้ตอนประมวลผล, key 'r' = ใช้ตอนตรวจทาน/โซน/ส่งออก/อ่านทะเบียน
 function codecMsg(err){return err&&err.code===4?'Chrome เปิดไฟล์นี้ไม่ได้ (มักเป็น H.265/HEVC, MKV, AVI) — แปลงเป็น MP4 (H.264) ก่อน':'เปิดวิดีโอไม่ได้'}
+// จำกัดจำนวนวิดีโอที่เปิดค้างไว้พร้อมกัน เพื่อไม่ให้ decoder หมด
+const OPEN_MAX=3;
+const openOrder=[];
+function touchOpen(it,key){
+  const id=it.id+':'+key;
+  const i=openOrder.indexOf(id);if(i>=0)openOrder.splice(i,1);
+  openOrder.push(id);
+  while(openOrder.length>OPEN_MAX){
+    const old=openOrder.shift();
+    const [oid,okey]=old.split(':');
+    const other=items.find(x=>String(x.id)===oid);
+    if(other&&other!==it)releaseVid(other,okey);
+  }
+}
 function ensureVid(it,key){
   if(it[key])return Promise.resolve(it[key]);
-  if(!it.url)it.url=URL.createObjectURL(it.file);
+  if(it.url)URL.revokeObjectURL(it.url);
+  it.url=URL.createObjectURL(it.file);
   const attempt=()=>new Promise((res,rej)=>{
     const v=document.createElement('video');v.muted=true;v.preload='auto';v.playsInline=true;
     let done=false;
     const fin=(ok,err)=>{if(done)return;done=true;clearTimeout(to);ok?res(v):rej(err)};
-    const to=setTimeout(()=>fin(false,new Error('เปิดวิดีโอค้าง (60 วิ)')),60000);
-    const good=()=>{it[key]=v;it.dur=it.dur||v.duration;fin(true)};
+    const to=setTimeout(()=>fin(false,new Error('เปิดวิดีโอไม่สำเร็จ — ลองกดประมวลผลหรือตรวจทานอีกครั้ง')),60000);
+    const good=()=>{it[key]=v;it.dur=it.dur||v.duration;touchOpen(it,key);fin(true)};
     v.onloadeddata=good;
     v.onloadedmetadata=()=>{if(v.readyState>=2)good()};
     v.onerror=()=>fin(false,new Error(codecMsg(v.error)));
     v.src=it.url;
   });
-  return attempt().catch(()=>{ // ลองใหม่หนึ่งครั้ง
+  return attempt().catch(()=>{
     releaseVid(it,key);
     return attempt();
   });
@@ -926,6 +944,72 @@ async function runQueue(cat){
   $('pause').textContent='พัก';$('stop').textContent='หยุด';
   renderAll();
 }
+// ---------- บันทึก / โหลดผลการประมวลผล ----------
+function serializeSession(){
+  const vids=items.filter(i=>i.status==='done').map(it=>({
+    name:it.name,size:it.file.size,lastModified:it.file.lastModified,
+    cat:it.cat,step:it.step,dur:it.dur,
+    events:it.events.map(e=>({
+      ts:e.ts,te:e.te,ang:e.ang,ok:e.ok,plate:e.plate,auto:e.auto,
+      // เก็บเส้นทางการติดตามเพื่อแสดงกรอบและหาเฟรมป้าย
+      pts:e.pts.map(p=>({t:p.t,cx:p.cx,cy:p.cy,b:p.b,s:p.s}))
+    }))
+  }));
+  return{
+    v:1,savedAt:new Date().toISOString(),
+    settings:Object.fromEntries(SET_IDS.map(id=>{const el=$(id);return[id,el.type==='checkbox'?el.checked:el.value]})),
+    cats,zones:zonesAll,videos:vids
+  };
+}
+$('saveSess').onclick=async()=>{
+  const done=items.filter(i=>i.status==='done');
+  if(!done.length)return msg('ยังไม่มีวิดีโอที่ประมวลผลเสร็จ');
+  const data=serializeSession();
+  const blob=new Blob([JSON.stringify(data)],{type:'application/json'});
+  const name=`ผลตรวจ_${new Date().toISOString().slice(0,16).replace(/[:T]/g,'-')}.uturn.json`;
+  try{
+    if(window.showSaveFilePicker){
+      const fh=await showSaveFilePicker({suggestedName:name,types:[{description:'ผลการตรวจ',accept:{'application/json':['.json']}}]});
+      const w=await fh.createWritable();await w.write(blob);await w.close();
+    }else{
+      const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();
+    }
+    msg(`บันทึกแล้ว ${done.length} วิดีโอ ${done.reduce((a,i)=>a+i.events.length,0)} เหตุการณ์`,'บันทึกสำเร็จ');
+  }catch(err){if(err.name!=='AbortError')msg('บันทึกไม่สำเร็จ: '+err.message)}
+};
+$('loadSess').onclick=()=>$('sf').click();
+$('sf').onchange=async e=>{
+  const f=e.target.files[0];e.target.value='';if(!f)return;
+  let data;try{data=JSON.parse(await f.text())}catch(err){return msg('ไฟล์นี้ไม่ใช่ผลการตรวจที่บันทึกไว้')}
+  if(!data||data.v!==1||!Array.isArray(data.videos))return msg('รูปแบบไฟล์ไม่ถูกต้อง');
+  // ให้ผู้ใช้เลือกวิดีโอจริงเพื่อจับคู่กับผลที่บันทึก
+  const vf=await pickVideosFor(data.videos);
+  if(!vf)return;
+  let matched=0,missing=[];
+  for(const rec of data.videos){
+    const file=vf.find(x=>x.name===rec.name&&x.size===rec.size);
+    if(!file){missing.push(rec.name);continue}
+    const it={id:++uid,file,name:rec.name,cat:rec.cat,status:'done',pct:100,events:[],p:null,r:null,url:null,dur:rec.dur||0,step:rec.step||0.2,err:'',resume:null};
+    it.events=rec.events.map(e=>({...e,pts:e.pts.map(p=>({...p})),ocrState:null,ocrErr:'',plateImg:null}));
+    items.push(it);matched++;
+  }
+  if(data.zones){for(const k in data.zones)if(!zonesAll[k])zonesAll[k]=data.zones[k];saveZones()}
+  for(const c of data.cats||[])if(!cats.includes(c))cats.push(c);
+  localStorage.uCats=JSON.stringify(cats);
+  renderAll();
+  msg(`โหลดสำเร็จ ${matched} วิดีโอ`+(missing.length?`\n\nไม่พบไฟล์ต่อไปนี้ จึงยังไม่ได้โหลด:\n${missing.join('\n')}`:''),'โหลดผลสำเร็จ');
+};
+// ให้เลือกไฟล์วิดีโอที่ต้องการจับคู่ (ทีละหลายไฟล์ได้)
+function pickVideosFor(records){
+  return new Promise(res=>{
+    const inp=document.createElement('input');inp.type='file';inp.multiple=true;
+    inp.accept='video/*,.mkv,.avi';
+    inp.onchange=()=>res([...inp.files]);
+    inp.oncancel=()=>res(null);
+    msg(`ระบบจะจับคู่กับวิดีโอ ${records.length} ไฟล์\nกรุณาเลือกไฟล์วิดีโอเดิมทั้งหมดในหน้าถัดไป`,'เลือกวิดีโอ').then(()=>inp.click());
+  });
+}
+  
 $('runAll').onclick=()=>{if(!items.some(i=>i.resume))$('evth').innerHTML='';refreshLiveBox();runQueue(null)};
 $('runCat').onclick=()=>{if(!items.some(i=>i.resume))$('evth').innerHTML='';refreshLiveBox();runQueue(filterCat)};
 $('pause').onclick=()=>{hardStop=false;stopF=true;$('pause').textContent='กำลังพัก…'};
