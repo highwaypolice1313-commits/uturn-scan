@@ -1379,8 +1379,8 @@ function rangeShots(a,b,step,label=''){
   if(!out.length)out.push({t:+(Math.round(b/RS)*RS).toFixed(3),label});
   return out;
 }
-function makeShots(e,v,o){
-  const end=v.duration-0.05;
+function makeShots(e,dur,o){
+  const end=(dur||1e9)-0.05;
   if(o.detail)return rangeShots(Math.max(0,e.ts-o.pre),Math.min(end,e.te+o.post),o.fine);
   if(o.all)return rangeShots(Math.max(0,e.ts-o.pre),Math.min(end,e.te+o.post),Math.max(o.fine,0.5));
   return [
@@ -1436,11 +1436,7 @@ async function writeBlob(dir,fn,blob){
 async function exportEvents(list){
   let root;try{root=await showDirectoryPicker({mode:'readwrite',id:'uturn-out'})}catch(err){return}
   const o=S(),q=parseFloat($('qual').value)||0.9,bestMode=$('bestPlate').checked;
-  const plans=[];
-  for(const [it,e] of list){
-    const v=await ensureVid(it,'r');
-    plans.push({it,e,v,shots:bestMode?null:makeShots(e,v,o)});
-  }
+  const plans=list.map(([it,e])=>({it,e}));
 
   // ข้ามเหตุการณ์ที่ค่าเวลาไม่สมบูรณ์
   const bad=plans.filter(p=>!Number.isFinite(p.e.ts)||!Number.isFinite(p.e.te));
@@ -1451,17 +1447,8 @@ async function exportEvents(list){
   }
   if(!plans.length)return;
 
-  const totalShots=bestMode?plans.length:plans.reduce((a,p)=>a+p.shots.length,0);
-
-  if(!bestMode){
-    let estBytes=0;
-    try{const sb=await prepBlob(plans[0].v,plans[0].shots[0].t,q);estBytes=sb.size*totalShots}
-    catch(err){console.warn('estimate',err)}
-    if(estBytes>500e6){
-      const ok=await confirmD(`จะส่งออก ${totalShots} ภาพ ใช้พื้นที่ประมาณ ${fmtBytes(estBytes)}\n\nเบราว์เซอร์อ่านพื้นที่ว่างของดิสก์ไม่ได้ กรุณาตรวจว่าปลายทางมีพื้นที่พอก่อนดำเนินการต่อ`,'ตรวจพื้นที่ก่อนส่งออก');
-      if(!ok)return;
-    }
-  }
+  // นับจำนวนภาพรวมโดยใช้ it.dur ที่เก็บไว้ตอนประมวลผล (ไม่ต้องเปิดวิดีโอทุกไฟล์พร้อมกัน)
+  const totalShots=bestMode?plans.length:plans.reduce((a,p)=>a+makeShots(p.e,p.it.dur,o).length,0);
 
   expUI.open();
   const vidDirs=new Map();
@@ -1469,7 +1456,9 @@ async function exportEvents(list){
   let done=0,csvName='';
   try{
     for(let n=0;n<plans.length;n++){
-      const {it,e,v}=plans[n],p=e.plate;
+      const {it,e}=plans[n],p=e.plate;
+      // เปิดวิดีโอของรายการนี้ตอนที่ต้องใช้จริงเท่านั้น กัน OPEN_MAX เบียดไฟล์อื่นที่ยังไม่ได้ใช้
+      const v=await ensureVid(it,'r');
       const cdir0=await root.getDirectoryHandle(safe(it.cat),{create:true});
       const cdir=e.ok===false?await cdir0.getDirectoryHandle('ไม่ใช่',{create:true}):cdir0;
       if(!vidDirs.has(it.id)){
@@ -1482,7 +1471,7 @@ async function exportEvents(list){
       const evLabel=`เหตุการณ์${String(no).padStart(3,'0')}${plateTxt?'_'+safe(plateTxt):''}`;
       const evDir=await vidDir.getDirectoryHandle(await uniqueName(vidDir,evLabel,'','dir'),{create:true});
 
-      let shots=plans[n].shots;
+      let shots=bestMode?null:makeShots(e,it.dur||v.duration,o);
       if(bestMode){
         expUI.set(done/totalShots,`${evLabel} · กำลังหาภาพที่ทะเบียนชัดที่สุด…`);
         const bt=await bestPlateTime(it,e,v,o);
