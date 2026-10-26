@@ -151,10 +151,9 @@ canvas{max-width:100%;display:block;background:#000;border-radius:8px}
       <div class="row">
         <label>คุณภาพภาพ
           <select id="qual">
-            <option value="0.75" selected>ประหยัดไฟล์ (0.75) · ชัดพอสำหรับทะเบียน</option>
-            <option value="0.80">ประหยัด (0.80)</option>
-            <option value="0.90">มาตรฐาน (0.90)</option>
-            <option value="0.95">คมชัดสูงสุด (0.95)</option>
+            <option value="0.75">ลดขนาด (ไฟล์เล็ก, JPEG 0.75)</option>
+            <option value="0.92" selected>มาตรฐาน (JPEG 0.92)</option>
+            <option value="full">เต็ม (PNG ไม่บีบอัด ไม่เสียคุณภาพ)</option>
           </select>
         </label>
         <label>ตรวจหยาบ (หาว่ามีรถ) ทุก <input type="number" id="idle" value="1" step="0.5" min="0.5"> วิ</label>
@@ -225,6 +224,8 @@ canvas{max-width:100%;display:block;background:#000;border-radius:8px}
           <label>หมวด <select id="rvCat"></select></label>
           <label><input type="checkbox" id="rvOnly" checked> เฉพาะที่ยังไม่ตรวจ</label>
           <span id="rvcnt" class="mu"></span>
+          <button id="saveSessRv">บันทึกผลการตรวจ</button>
+          <button id="expCsv">ส่งออก CSV สรุปผล</button>
         </div>
         <div class="row">
           <label><input type="checkbox" id="exall"> ส่งออกทุกภาพในช่วง</label>
@@ -964,7 +965,7 @@ function serializeSession(){
     cats,zones:zonesAll,videos:vids
   };
 }
-$('saveSess').onclick=async()=>{
+async function saveSession(){
   const done=items.filter(i=>i.status==='done');
   if(!done.length)return msg('ยังไม่มีวิดีโอที่ประมวลผลเสร็จ');
   const data=serializeSession();
@@ -977,9 +978,11 @@ $('saveSess').onclick=async()=>{
     }else{
       const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();
     }
-    msg(`บันทึกแล้ว ${done.length} วิดีโอ ${done.reduce((a,i)=>a+i.events.length,0)} เหตุการณ์`,'บันทึกสำเร็จ');
+    const ok=done.reduce((a,i)=>a+i.events.filter(e=>e.ok===true).length,0);
+    msg(`บันทึกแล้ว ${done.length} วิดีโอ ${done.reduce((a,i)=>a+i.events.length,0)} เหตุการณ์ (ยืนยันแล้ว ${ok})`,'บันทึกสำเร็จ');
   }catch(err){if(err.name!=='AbortError')msg('บันทึกไม่สำเร็จ: '+err.message)}
-};
+}
+$('saveSess').onclick=saveSession;
 $('loadSess').onclick=()=>$('sf').click();
 $('sf').onchange=async e=>{
   const f=e.target.files[0];e.target.value='';if(!f)return;
@@ -1186,6 +1189,32 @@ function renderReview(){
   $('rvcnt').textContent=`ยืนยันแล้ว ${ok}/${cnt}`;
   renderStats();updBtns();
 }
+$('saveSessRv').onclick=saveSession;
+// ส่งออกผลตรวจ (Y/N + ทะเบียน) เป็น CSV เบาๆ ไว้เปิดดูเร็วๆ ใน Excel โดยไม่ต้องเข้าแอพ
+function csvOfReview(){
+  let csv='\ufeffหมวด,ไฟล์วิดีโอ,เหตุการณ์ที่,เริ่ม,จบ,มุม/โซน,ผลตรวจ,ประเภทรถ,หมวดทะเบียน,เลขทะเบียน,จังหวัด,ทะเบียนที่ระบบอ่านได้\n';
+  let n=0;
+  for(const it of items){
+    if(it.status!=='done')continue;
+    it.events.forEach((e,k)=>{
+      const p=e.plate,a=e.auto;
+      const autoTxt=a?[a.f,a.n,a.v].filter(Boolean).join(' '):'';
+      csv+=[it.cat,it.name,k+1,fmtMS(evS(it,e)),fmtMS(evE(it,e)),e.ang?Math.round(e.ang)+'°':'A→B',
+        e.ok===true?'ใช่':e.ok===false?'ไม่ใช่':'ยังไม่ตรวจ',p.t,p.f,p.n,p.v,autoTxt].map(csvq).join(',')+'\n';
+      n++;
+    });
+  }
+  return{csv,n};
+}
+$('expCsv').onclick=()=>{
+  const{csv,n}=csvOfReview();
+  if(!n)return msg('ยังไม่มีเหตุการณ์ให้ส่งออก');
+  const blob=new Blob([csv],{type:'text/csv'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download=`ผลตรวจ_${new Date().toISOString().slice(0,16).replace(/[:T]/g,'-')}.csv`;
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+};
 $('rvCat').onchange=renderReview;
 $('rvOnly').onchange=renderReview;
 $('evl').onclick=e=>{const d=e.target.closest('[data-rv]');if(!d)return;const [id,k]=flat[+d.dataset.rv];selectRV(id,k)};
@@ -1424,10 +1453,11 @@ async function bestPlateTime(it,e,v,o){
   }
   return best;
 }
-async function prepBlob(v,t,q){
+async function prepBlob(v,t,q,fmt='jpeg'){
   const bmp=await getFrame(v,t),cv=document.createElement('canvas');
   cv.width=bmp.width;cv.height=bmp.height;cv.getContext('2d').drawImage(bmp,0,0);bmp.close();
-  return new Promise(r=>cv.toBlob(r,'image/jpeg',q));
+  // PNG ไม่มีค่าคุณภาพ (ไม่บีบอัดแบบสูญเสีย) จึงไม่ส่ง q เข้าไป
+  return new Promise(r=>fmt==='png'?cv.toBlob(r,'image/png'):cv.toBlob(r,'image/jpeg',q));
 }
 async function writeBlob(dir,fn,blob){
   const fh=await dir.getFileHandle(fn,{create:true}),w=await fh.createWritable();
@@ -1435,7 +1465,7 @@ async function writeBlob(dir,fn,blob){
 }
 async function exportEvents(list){
   let root;try{root=await showDirectoryPicker({mode:'readwrite',id:'uturn-out'})}catch(err){return}
-  const o=S(),q=parseFloat($('qual').value)||0.9,bestMode=$('bestPlate').checked;
+  const o=S(),qv=$('qual').value,imgFmt=qv==='full'?'png':'jpeg',q=imgFmt==='png'?1:(parseFloat(qv)||0.92),ext=imgFmt==='png'?'.png':'.jpg',bestMode=$('bestPlate').checked;
   const plans=list.map(([it,e])=>({it,e}));
 
   // ข้ามเหตุการณ์ที่ค่าเวลาไม่สมบูรณ์
@@ -1478,12 +1508,12 @@ async function exportEvents(list){
         shots=[{t:+(bt!=null?bt:e.te).toFixed(3),label:'ป้ายชัด_'}];
       }
 
-      let pend=prepBlob(v,shots[0].t,q);
+      let pend=prepBlob(v,shots[0].t,q,imgFmt);
       for(let k=0;k<shots.length;k++){
         const sh=shots[k];
         const blob=await pend;
-        pend=k+1<shots.length?prepBlob(v,shots[k+1].t,q):null;
-        const fn=`${evLabel}_${sh.label}${clockTag(it.name,sh.t)}.jpg`;
+        pend=k+1<shots.length?prepBlob(v,shots[k+1].t,q,imgFmt):null;
+        const fn=`${evLabel}_${sh.label}${clockTag(it.name,sh.t)}${ext}`;
         await writeBlob(evDir,fn,blob);
         done++;
         expUI.set(done/totalShots,`${evLabel} · ${done}/${totalShots} · ${fn}`);
