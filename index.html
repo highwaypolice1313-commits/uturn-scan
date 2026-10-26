@@ -230,6 +230,7 @@ canvas{max-width:100%;display:block;background:#000;border-radius:8px}
           <label><input type="checkbox" id="exall"> ส่งออกทุกภาพในช่วง</label>
           <label><input type="checkbox" id="detail" checked> จับภาพละเอียดรอบเหตุการณ์</label>
           <label>ทุก <input type="number" id="fine" value="0.04" step="0.01" min="0.04" style="width:64px"> วิ</label>
+          <label><input type="checkbox" id="incN"> รวมที่กด N (แยกโฟลเดอร์ "ไม่ใช่")</label>
           <button id="exp" class="pri" disabled>ส่งออกที่ยืนยันแล้ว</button>
           <span id="exs" class="mu"></span>
         </div>
@@ -380,7 +381,7 @@ let cats=JSON.parse(localStorage.uCats||'null')||['ทั่วไป'];
 let zonesAll=JSON.parse(localStorage.uZones||'{}');
 let REV={id:null,k:-1},fi=0,flat=[],showTok=0,plTok=0,lastType='',zk=null,zSample=null;
 const hist=[];   // ประวัติ Y/N สำหรับปุ่มย้อนกลับ
-const SET_IDS=['step','conf','mot','ang','pre','post','lvon','exall','idle','detail','fine','qual'];
+const SET_IDS=['step','conf','mot','ang','pre','post','lvon','exall','idle','detail','fine','bestPlate','qual','incN'];
 
 const ang=(a,b)=>Math.acos(Math.max(-1,Math.min(1,(a[0]*b[0]+a[1]*b[1])/((Math.hypot(...a)*Math.hypot(...b))||1))))*180/Math.PI;
 const poly=(c,z,w,h)=>{c.beginPath();z.forEach(([x,y],i)=>i?c.lineTo(x*w,y*h):c.moveTo(x*w,y*h));if(z.length>2)c.closePath()};
@@ -482,7 +483,9 @@ function releaseVid(it,key){
   try{v.pause();v.removeAttribute('src');v.load()}catch(e){}
   it[key]=null;
 }
-function seek(v,t){return new Promise(r=>{
+function seek(v,t){return new Promise((r,j)=>{
+  if(!Number.isFinite(t))return j(new Error('เวลาเฟรมไม่ถูกต้อง (ค่า '+t+')'));
+  if(!Number.isFinite(v.duration)||v.duration<=0)return j(new Error('ยังอ่านความยาววิดีโอไม่ได้ ลองเปิดไฟล์ใหม่'));
   const tt=Math.max(0,Math.min(t,v.duration-0.05));
   if(!v.seeking&&Math.abs(v.currentTime-tt)<0.001&&v.readyState>=2)return r();
   const done=()=>{clearTimeout(to);v.removeEventListener('seeked',done);r()};
@@ -1140,7 +1143,7 @@ function updBtns(){
   $('runCat').textContent=filterCat==='all'?'เริ่มเฉพาะหมวด (เลือกหมวดก่อน)':`เริ่มหมวด "${filterCat}"`;
   $('pause').disabled=!running;
   $('stop').disabled=!running;
-  $('exp').disabled=!items.some(i=>i.events.some(e=>e.ok===true));
+  $('exp').disabled=!items.some(i=>i.events.some(e=>e.ok===true||(e.ok===false&&$('incN').checked)));
   $('expOne').disabled=!curEv();
   $('undo').disabled=!hist.length;
   $('ocRun').disabled=ocrBusy||running;
@@ -1413,6 +1416,13 @@ async function exportEvents(list){
   }
   const totalShots=plans.reduce((a,p)=>a+p.shots.length,0);
 
+    const bad=plans.filter(p=>!Number.isFinite(p.e.ts)||!Number.isFinite(p.e.te));
+  if(bad.length){
+    const ok=await confirmD(`มี ${bad.length} เหตุการณ์ที่ค่าเวลาไม่สมบูรณ์ ระบบจะข้ามรายการเหล่านี้\n\nกด "ยืนยัน" เพื่อส่งออกส่วนที่เหลือ`,'ข้ามรายการที่ผิด');
+    if(!ok)return;
+    for(const b of bad)plans.splice(plans.indexOf(b),1);
+  }
+  
   // ประมาณขนาดจากภาพตัวอย่าง 1 ภาพ แล้วเตือนถ้าใหญ่เกิน 500 MB
   let estBytes=0;
   try{const sb=await prepBlob(plans[0].v,plans[0].shots[0].t,q);estBytes=sb.size*totalShots}
@@ -1424,12 +1434,13 @@ async function exportEvents(list){
 
   expUI.open();
   const vidDirs=new Map();
-  let csv='\ufeffหมวด,ไฟล์วิดีโอ,จุดเริ่ม,จุดจบ,มุมกลับรถ,ประเภทรถ,รหัสประเภท,หมวดทะเบียน,เลข,จังหวัด,โฟลเดอร์\n';
+  let csv='\ufeffหมวด,ไฟล์วิดีโอ,จุดเริ่ม,จุดจบ,มุมกลับรถ,ประเภทรถ,รหัสประเภท,หมวดทะเบียน,เลข,จังหวัด,ผลตรวจ,โฟลเดอร์\n';
   let done=0,csvName='';
   try{
     for(const {it,e,v,shots} of plans){
       const p=e.plate;
-      const cdir=await root.getDirectoryHandle(safe(it.cat),{create:true});
+      const cdir0=await root.getDirectoryHandle(safe(it.cat),{create:true});
+      const cdir=e.ok===false?await cdir0.getDirectoryHandle('ไม่ใช่',{create:true}):cdir0;
       if(!vidDirs.has(it.id)){
         const vn=await uniqueName(cdir,safe(it.name.replace(/\.[^.]+$/,'')),'','dir');
         vidDirs.set(it.id,await cdir.getDirectoryHandle(vn,{create:true}));
@@ -1451,8 +1462,7 @@ async function exportEvents(list){
         done++;
         expUI.set(done/totalShots,`${evLabel} · ${done}/${totalShots} ภาพ · ${fn}`);
       }
-      csv+=[it.cat,it.name,fmtMS(e.ts),fmtMS(e.te),e.ang?Math.round(e.ang):'A→B',p.t,VCODE[p.t]||'',p.f,p.n,p.v,`${vidDir.name}/${evDir.name}`].map(csvq).join(',')+'\n';
-    }
+      csv+=[it.cat,it.name,fmtMS(e.ts),fmtMS(e.te),e.ang?Math.round(e.ang):'A→B',p.t,VCODE[p.t]||'',p.f,p.n,p.v,e.ok===false?'ไม่ใช่':'ใช่',`${cdir.name}/${vidDir.name}/${evDir.name}`].map(csvq).join(',')+'\n';    }
     csvName=await uniqueName(root,'สรุป','.csv','file');
     await writeBlob(root,csvName,new Blob([csv],{type:'text/csv'}));
     $('exs').textContent=`เสร็จแล้ว ${plans.length} เหตุการณ์ → ${root.name}`;
@@ -1465,7 +1475,8 @@ async function exportEvents(list){
   }
 }
 $('exp').onclick=()=>{
-  const list=[];for(const it of items)for(const e of it.events)if(e.ok===true)list.push([it,e]);
+  const incN=$('incN').checked;
+  const list=[];for(const it of items)for(const e of it.events)if(e.ok===true||(incN&&e.ok===false))list.push([it,e]);
   if(!list.length)return msg('ยังไม่มีเหตุการณ์ที่ยืนยันแล้ว (กด Y ก่อน)');
   return exportEvents(list);
 };
