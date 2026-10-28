@@ -346,6 +346,31 @@ const evS=(it,e)=>e.ts;
 const evE=(it,e)=>e.te;
 const nearPt=(pts,t)=>{let q=pts[0];for(const p of pts)if(Math.abs(p.t-t)<Math.abs(q.t-t))q=p;return q};
 
+  const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+
+// เปิดเสียงเงียบ (gain ต่ำมาก ไม่ได้ยิน) เพื่อให้ Chrome ไม่หน่วงแท็บที่ซ่อนอยู่
+let kaCtx=null;
+function keepAlive(on){
+  try{
+    if(on){
+      if(!kaCtx){
+        kaCtx=new (window.AudioContext||window.webkitAudioContext)();
+        const osc=kaCtx.createOscillator(),g=kaCtx.createGain();
+        g.gain.value=0.0001;osc.connect(g);g.connect(kaCtx.destination);osc.start();
+      }
+      if(kaCtx.state!=='running')kaCtx.resume();
+    }else if(kaCtx&&kaCtx.state==='running')kaCtx.suspend();
+  }catch(e){console.warn('keepAlive',e)}
+}
+
+// อ่านเฟรม ลองใหม่อัตโนมัติถ้าไม่สำเร็จ
+async function grab(v,t,tries=3){
+  for(let k=0;k<tries;k++){
+    try{return await getFrame(v,t)}
+    catch(err){if(k===tries-1)throw err;await sleep(400*(k+1))}
+  }
+}
+
 // ---------- Modal แจ้งเตือนแทน alert / confirm / prompt ----------
 function dlg(text,{title='แจ้งเตือน',input,ok='ตกลง',cancel=null}={}){
   return new Promise(res=>{
@@ -467,23 +492,47 @@ function releaseVid(it,key){
 }
 function ensureVid(it,key){
   if(it[key])return Promise.resolve(it[key]);
-  if(it.url)URL.revokeObjectURL(it.url);
+  // สร้าง URL ใหม่ทุกครั้ง โดยไม่ยกเลิก URL เดิมที่วิดีโอตัวอื่นอาจยังใช้อยู่
   it.url=URL.createObjectURL(it.file);
   const attempt=()=>new Promise((res,rej)=>{
     const v=document.createElement('video');v.muted=true;v.preload='auto';v.playsInline=true;
     let done=false;
     const fin=(ok,err)=>{if(done)return;done=true;clearTimeout(to);ok?res(v):rej(err)};
-    const to=setTimeout(()=>fin(false,new Error('เปิดวิดีโอไม่สำเร็จ — ลองกดประมวลผลหรือตรวจทานอีกครั้ง')),60000);
+    const to=setTimeout(()=>fin(false,new Error('เปิดวิดีโอไม่สำเร็จ (หมดเวลา)')),60000);
     const good=()=>{it[key]=v;it.dur=it.dur||v.duration;touchOpen(it,key);fin(true)};
     v.onloadeddata=good;
     v.onloadedmetadata=()=>{if(v.readyState>=2)good()};
     v.onerror=()=>fin(false,new Error(codecMsg(v.error)));
     v.src=it.url;
   });
-  return attempt().catch(()=>{
-    releaseVid(it,key);
-    return attempt();
-  });
+  return (async()=>{
+    for(let k=0;k<3;k++){
+      try{return await attempt()}
+      catch(err){if(k===2)throw err;releaseVid(it,key);await sleep(1000*(k+1))}
+    }
+  })();
+}
+  // วิดีโอแยกสำหรับการส่งออก ไม่ปนกับหน้าตรวจทาน จึงไม่ถูกปล่อยเมื่อสลับไปทำอย่างอื่น
+async function openPrivate(it){
+  for(let k=0;k<3;k++){
+    const url=URL.createObjectURL(it.file);
+    try{
+      return await new Promise((res,rej)=>{
+        const v=document.createElement('video');v.muted=true;v.preload='auto';v.playsInline=true;v._url=url;
+        const to=setTimeout(()=>rej(new Error('เปิดวิดีโอไม่สำเร็จ (หมดเวลา)')),60000);
+        v.onloadeddata=()=>{clearTimeout(to);res(v)};
+        v.onerror=()=>{clearTimeout(to);rej(new Error(codecMsg(v.error)))};
+        v.src=url;
+      });
+    }catch(err){
+      URL.revokeObjectURL(url);
+      if(k===2)throw err;
+      await sleep(1000*(k+1));
+    }
+  }
+}
+function closePrivate(v){
+  try{v.pause();v.removeAttribute('src');v.load();URL.revokeObjectURL(v._url)}catch(e){}
 }
 function seek(v,t){return new Promise((r,j)=>{
   if(!Number.isFinite(t))return j(new Error('เวลาเฟรมไม่ถูกต้อง (ค่า '+t+')'));
@@ -857,7 +906,7 @@ async function processItem(it){
   if(R.phase===1){
     while(R.t<dur&&!stopF){
       let bmp=null;
-      try{bmp=await getFrame(v,R.t)}
+try{bmp=await grab(v,R.t)}
       catch(err){console.warn('frame',R.t,err);R.t+=o.coarse;continue}
       smx.drawImage(bmp,0,0,80,45);
       const d=smx.getImageData(0,0,80,45).data,g=new Uint8Array(3600);
@@ -887,7 +936,7 @@ async function processItem(it){
       if(R.wt==null)R.wt=w.a;
       while(R.wt<=w.b&&!stopF){
         let bmp=null;
-        try{bmp=await getFrame(v,R.wt)}
+        try{bmp=await grab(v,R.wt)}
         catch(err){console.warn('frame',R.wt,err);R.wt+=o.step;continue}
         let dets=[];
         try{dets=await withTO(detect(bmp,o.conf),15000,'detect timeout');update(C,R.wt,dets,bmp)}
@@ -938,9 +987,10 @@ async function runQueue(cat){
   if(!session)return msg('โมเดลตรวจรถยังไม่พร้อม — เลือกไฟล์ yolov8n.onnx ก่อน');
   RUN={total:items.filter(i=>runnable(i,cat)).length,doneN:0};
   if(!RUN.total)return;
+  keepAlive(true);
   running=true;stopF=false;hardStop=false;updBtns();
   while(!stopF){const it=items.find(i=>runnable(i,cat));if(!it)break;await runOne(it)}
-  running=false;
+  running=false;keepAlive(false);
   const left=items.filter(i=>runnable(i,cat)).length;
   $('ovT').textContent=hardStop?'หยุดแล้ว — ไฟล์นั้นจะเริ่มใหม่ตั้งแต่ต้น'
     :(stopF&&left)?'พักแล้ว — กด "ทำต่อ" เพื่อเริ่มจากจุดเดิม'
@@ -1465,71 +1515,90 @@ async function writeBlob(dir,fn,blob){
   await w.write(blob);await w.close();
 }
 async function exportEvents(list){
-  let root;try{root=await showDirectoryPicker({mode:'readwrite',id:'uturn-out'})}catch(err){return}
-  const o=S(),qv=$('qual').value,imgFmt=qv==='full'?'png':'jpeg',q=imgFmt==='png'?1:(parseFloat(qv)||0.92),ext=imgFmt==='png'?'.png':'.jpg',bestMode=$('bestPlate').checked;
-  const plans=list.map(([it,e])=>({it,e}));
-
-  // ข้ามเหตุการณ์ที่ค่าเวลาไม่สมบูรณ์
-  const bad=plans.filter(p=>!Number.isFinite(p.e.ts)||!Number.isFinite(p.e.te));
-  if(bad.length){
-    const ok=await confirmD(`มี ${bad.length} เหตุการณ์ที่ค่าเวลาไม่สมบูรณ์ ระบบจะข้ามรายการเหล่านี้\n\nกด "ยืนยัน" เพื่อส่งออกส่วนที่เหลือ`,'ข้ามรายการที่ผิด');
-    if(!ok)return;
-    for(const b of bad)plans.splice(plans.indexOf(b),1);
-  }
-  if(!plans.length)return;
-
-  // นับจำนวนภาพรวมโดยใช้ it.dur ที่เก็บไว้ตอนประมวลผล (ไม่ต้องเปิดวิดีโอทุกไฟล์พร้อมกัน)
-  const totalShots=bestMode?plans.length:plans.reduce((a,p)=>a+makeShots(p.e,p.it.dur,o).length,0);
-
-  expUI.open();
-  const vidDirs=new Map();
-  let csv='\ufeffหมวด,ไฟล์วิดีโอ,จุดเริ่ม,จุดจบ,มุมกลับรถ,ประเภทรถ,รหัสประเภท,หมวดทะเบียน,เลข,จังหวัด,ผลตรวจ,โฟลเดอร์\n';
-  let done=0,csvName='';
+  keepAlive(true);
+  const pv=new Map(); // วิดีโอแยกต่อไฟล์สำหรับการส่งออกนี้
+  const getV=async it=>{if(!pv.has(it.id))pv.set(it.id,await openPrivate(it));return pv.get(it.id)};
   try{
-    for(let n=0;n<plans.length;n++){
-      const {it,e}=plans[n],p=e.plate;
-      // เปิดวิดีโอของรายการนี้ตอนที่ต้องใช้จริงเท่านั้น กัน OPEN_MAX เบียดไฟล์อื่นที่ยังไม่ได้ใช้
-      const v=await ensureVid(it,'r');
-      const cdir0=await root.getDirectoryHandle(safe(it.cat),{create:true});
-      const cdir=e.ok===false?await cdir0.getDirectoryHandle('ไม่ใช่',{create:true}):cdir0;
-      if(!vidDirs.has(it.id)){
-        const vn=await uniqueName(cdir,safe(it.name.replace(/\.[^.]+$/,'')),'','dir');
-        vidDirs.set(it.id,await cdir.getDirectoryHandle(vn,{create:true}));
-      }
-      const vidDir=vidDirs.get(it.id);
-      const no=it.events.indexOf(e)+1;
-      const plateTxt=[p.f&&p.n?p.f+p.n:(p.f||p.n),p.v].filter(Boolean).join('-');
-      const evLabel=`เหตุการณ์${String(no).padStart(3,'0')}${plateTxt?'_'+safe(plateTxt):''}`;
-      const evDir=await vidDir.getDirectoryHandle(await uniqueName(vidDir,evLabel,'','dir'),{create:true});
+    let root;try{root=await showDirectoryPicker({mode:'readwrite',id:'uturn-out'})}catch(err){return}
+    const o=S(),q=parseFloat($('qual').value)||0.9,bestMode=$('bestPlate').checked;
 
-      let shots=bestMode?null:makeShots(e,it.dur||v.duration,o);
-      if(bestMode){
-        expUI.set(done/totalShots,`${evLabel} · กำลังหาภาพที่ทะเบียนชัดที่สุด…`);
-        const bt=await bestPlateTime(it,e,v,o);
-        shots=[{t:+(bt!=null?bt:e.te).toFixed(3),label:'ป้ายชัด_'}];
-      }
-
-      let pend=prepBlob(v,shots[0].t,q,imgFmt);
-      for(let k=0;k<shots.length;k++){
-        const sh=shots[k];
-        const blob=await pend;
-        pend=k+1<shots.length?prepBlob(v,shots[k+1].t,q,imgFmt):null;
-        const fn=`${evLabel}_${sh.label}${clockTag(it.name,sh.t)}${ext}`;
-        await writeBlob(evDir,fn,blob);
-        done++;
-        expUI.set(done/totalShots,`${evLabel} · ${done}/${totalShots} · ${fn}`);
-      }
-      csv+=[it.cat,it.name,fmtMS(e.ts),fmtMS(e.te),e.ang?Math.round(e.ang):'A→B',p.t,VCODE[p.t]||'',p.f,p.n,p.v,e.ok===false?'ไม่ใช่':'ใช่',`${cdir.name}/${vidDir.name}/${evDir.name}`].map(csvq).join(',')+'\n';
+    let plans=[];
+    for(const [it,e] of list){
+      const v=await getV(it);
+      plans.push({it,e,v,shots:bestMode?null:makeShots(e,v,o)});
     }
-    csvName=await uniqueName(root,'สรุป','.csv','file');
-    await writeBlob(root,csvName,new Blob([csv],{type:'text/csv'}));
-    $('exs').textContent=`เสร็จแล้ว ${plans.length} เหตุการณ์ → ${root.name}`;
-    expUI.done(`เสร็จแล้ว ${totalShots} ภาพ · ${plans.length} เหตุการณ์ → ${root.name}\nไฟล์สรุป: ${csvName}`);
-  }catch(err){
-    console.error(err);
-    expUI.close();
-    $('exs').textContent='ส่งออกไม่สำเร็จ';
-    await msg(`ส่งออกไม่สำเร็จหลังเขียนไป ${done}/${totalShots} ภาพ\n${err.message||err}\n\nอาจเป็นเพราะพื้นที่เต็มหรือไม่มีสิทธิ์เขียนโฟลเดอร์`,'ส่งออกไม่สำเร็จ');
+
+    const bad=plans.filter(p=>!Number.isFinite(p.e.ts)||!Number.isFinite(p.e.te));
+    if(bad.length){
+      const ok=await confirmD(`มี ${bad.length} เหตุการณ์ที่ค่าเวลาไม่สมบูรณ์ ระบบจะข้ามรายการเหล่านี้\n\nกด "ยืนยัน" เพื่อส่งออกส่วนที่เหลือ`,'ข้ามรายการที่ผิด');
+      if(!ok)return;
+      plans=plans.filter(p=>!bad.includes(p));
+    }
+    if(!plans.length)return;
+
+    const totalShots=bestMode?plans.length:plans.reduce((a,p)=>a+p.shots.length,0);
+
+    if(!bestMode){
+      let estBytes=0;
+      try{const sb=await prepBlob(plans[0].v,plans[0].shots[0].t,q);estBytes=sb.size*totalShots}
+      catch(err){console.warn('estimate',err)}
+      if(estBytes>500e6){
+        const ok=await confirmD(`จะส่งออก ${totalShots} ภาพ ใช้พื้นที่ประมาณ ${fmtBytes(estBytes)}\n\nเบราว์เซอร์อ่านพื้นที่ว่างของดิสก์ไม่ได้ กรุณาตรวจว่าปลายทางมีพื้นที่พอก่อนดำเนินการต่อ`,'ตรวจพื้นที่ก่อนส่งออก');
+        if(!ok)return;
+      }
+    }
+
+    expUI.open();
+    const vidDirs=new Map();
+    let csv='\ufeffหมวด,ไฟล์วิดีโอ,จุดเริ่ม,จุดจบ,มุมกลับรถ,ประเภทรถ,รหัสประเภท,หมวดทะเบียน,เลข,จังหวัด,ผลตรวจ,โฟลเดอร์\n';
+    let done=0,csvName='';
+    try{
+      for(let n=0;n<plans.length;n++){
+        const {it,e,v}=plans[n],p=e.plate;
+        const cdir0=await root.getDirectoryHandle(safe(it.cat),{create:true});
+        const cdir=e.ok===false?await cdir0.getDirectoryHandle('ไม่ใช่',{create:true}):cdir0;
+        if(!vidDirs.has(it.id)){
+          const vn=await uniqueName(cdir,safe(it.name.replace(/\.[^.]+$/,'')),'','dir');
+          vidDirs.set(it.id,await cdir.getDirectoryHandle(vn,{create:true}));
+        }
+        const vidDir=vidDirs.get(it.id);
+        const no=it.events.indexOf(e)+1;
+        const plateTxt=[p.f&&p.n?p.f+p.n:(p.f||p.n),p.v].filter(Boolean).join('-');
+        const evLabel=`เหตุการณ์${String(no).padStart(3,'0')}${plateTxt?'_'+safe(plateTxt):''}`;
+        const evDir=await vidDir.getDirectoryHandle(await uniqueName(vidDir,evLabel,'','dir'),{create:true});
+
+        let shots=plans[n].shots;
+        if(bestMode){
+          expUI.set(done/totalShots,`${evLabel} · กำลังหาภาพที่ทะเบียนชัดที่สุด…`);
+          const bt=await bestPlateTime(it,e,v,o);
+          shots=[{t:+(bt!=null?bt:e.te).toFixed(3),label:'ป้ายชัด_'}];
+        }
+
+        let pend=prepBlob(v,shots[0].t,q);
+        for(let k=0;k<shots.length;k++){
+          const sh=shots[k];
+          const blob=await pend;
+          pend=k+1<shots.length?prepBlob(v,shots[k+1].t,q):null;
+          const fn=`${evLabel}_${sh.label}${clockTag(it.name,sh.t)}.jpg`;
+          await writeBlob(evDir,fn,blob);
+          done++;
+          expUI.set(done/totalShots,`${evLabel} · ${done}/${totalShots} · ${fn}`);
+        }
+        csv+=[it.cat,it.name,fmtMS(e.ts),fmtMS(e.te),e.ang?Math.round(e.ang):'A→B',p.t,VCODE[p.t]||'',p.f,p.n,p.v,e.ok===false?'ไม่ใช่':'ใช่',`${cdir.name}/${vidDir.name}/${evDir.name}`].map(csvq).join(',')+'\n';
+      }
+      csvName=await uniqueName(root,'สรุป','.csv','file');
+      await writeBlob(root,csvName,new Blob([csv],{type:'text/csv'}));
+      $('exs').textContent=`เสร็จแล้ว ${plans.length} เหตุการณ์ → ${root.name}`;
+      expUI.done(`เสร็จแล้ว ${totalShots} ภาพ · ${plans.length} เหตุการณ์ → ${root.name}\nไฟล์สรุป: ${csvName}`);
+    }catch(err){
+      console.error(err);
+      expUI.close();
+      $('exs').textContent='ส่งออกไม่สำเร็จ';
+      await msg(`ส่งออกไม่สำเร็จหลังเขียนไป ${done}/${totalShots} ภาพ\n${err.message||err}\n\nอาจเป็นเพราะพื้นที่เต็มหรือไม่มีสิทธิ์เขียนโฟลเดอร์`,'ส่งออกไม่สำเร็จ');
+    }
+  }finally{
+    for(const v of pv.values())closePrivate(v);
+    keepAlive(false);
   }
 }
 $('exp').onclick=()=>{
