@@ -409,6 +409,22 @@ let cats=JSON.parse(localStorage.uCats||'null')||['ทั่วไป'];
 let zonesAll=JSON.parse(localStorage.uZones||'{}');
 let REV={id:null,k:-1},fi=0,flat=[],showTok=0,plTok=0,lastType='',zk=null,zSample=null;
 const hist=[];   // ประวัติ Y/N สำหรับปุ่มย้อนกลับ
+// จำสถานะ Y/N ถาวรในเครื่อง โดยใช้ "ชื่อไฟล์ + ขนาด + เวลาเริ่มของเหตุการณ์" เป็นคีย์
+const verdictKey=(it,e)=>`${it.name}|${it.file.size}|${Math.round(e.ts*100)}`;
+function loadVerdicts(){try{return JSON.parse(localStorage.uVerdict||'{}')}catch(e){return{}}}
+function saveVerdict(it,e){
+  const m=loadVerdicts(),k=verdictKey(it,e);
+  if(e.ok===null||e.ok===undefined)delete m[k];
+  else m[k]={ok:e.ok,plate:e.plate};
+  localStorage.uVerdict=JSON.stringify(m);
+}
+function applyVerdicts(it){
+  const m=loadVerdicts();
+  for(const e of it.events){
+    const r=m[verdictKey(it,e)];
+    if(r){e.ok=r.ok;if(r.plate)e.plate=r.plate}
+  }
+}  
 const SET_IDS=['step','conf','mot','ang','pre','post','lvon','exall','idle','detail','fine','bestPlate','qual','incN'];
 
 const ang=(a,b)=>Math.acos(Math.max(-1,Math.min(1,(a[0]*b[0]+a[1]*b[1])/((Math.hypot(...a)*Math.hypot(...b))||1))))*180/Math.PI;
@@ -961,6 +977,7 @@ try{bmp=await grab(v,R.t)}
   await thumbNew(C,v,it);
   it.events=C.evs.sort((a,b)=>a.ts-b.ts).map(e=>({...e,ok:null,plate:{t:'',f:'',n:'',v:''},auto:null,plateImg:null,ocrState:null,ocrErr:''}));
   it.resume=null;
+  applyVerdicts(it);
   console.log('เสร็จ',it.name,'พบ',it.events.length,'เหตุการณ์');
   releaseVid(it,'p');
   return 'done';
@@ -1047,6 +1064,7 @@ $('sf').onchange=async e=>{
     if(!file){missing.push(rec.name);continue}
     const it={id:++uid,file,name:rec.name,cat:rec.cat,status:'done',pct:100,events:[],p:null,r:null,url:null,dur:rec.dur||0,step:rec.step||0.2,err:'',resume:null};
     it.events=rec.events.map(e=>({...e,pts:e.pts.map(p=>({...p})),ocrState:null,ocrErr:'',plateImg:null}));
+    applyVerdicts(it);
     items.push(it);matched++;
   }
   if(data.zones){for(const k in data.zones)if(!zonesAll[k])zonesAll[k]=data.zones[k];saveZones()}
@@ -1364,7 +1382,7 @@ function mark(v){
   const it=curIt(),e=curEv();if(!it||!e)return;
   hist.push({id:it.id,k:REV.k,ok:e.ok,plate:{...e.plate}});
   if(hist.length>300)hist.shift();
-  savePlate();e.ok=v;
+  savePlate();e.ok=v;saveVerdict(it,e);
   const idx=flat.findIndex(([id,k])=>id===REV.id&&k===REV.k);
   const only=$('rvOnly').checked;
   renderReview();
@@ -1378,7 +1396,7 @@ function undo(){
   const it=items.find(i=>i.id===h.id);
   const e=it&&it.events[h.k];
   if(!e){updBtns();return}
-  e.ok=h.ok;e.plate=h.plate;
+  e.ok=h.ok;e.plate=h.plate;saveVerdict(it,e);
   REV={id:h.id,k:h.k};
   renderReview();showRV();
 }
@@ -1525,11 +1543,10 @@ async function exportEvents(list){
     let plans=[];
     for(const [it,e] of list){
       const v=await getV(it);
-      plans.push({it,e,v,shots:bestMode?null:makeShots(e,v,o)});
+      plans.push({it,e,v,shots:bestMode?null:makeShots(e,v.duration,o)});
     }
 
-    const bad=plans.filter(p=>!Number.isFinite(p.e.ts)||!Number.isFinite(p.e.te));
-    if(bad.length){
+    const bad=plans.filter(p=>!Number.isFinite(p.e.ts)||!Number.isFinite(p.e.te)||(p.shots&&p.shots.some(s=>!Number.isFinite(s.t))));    if(bad.length){
       const ok=await confirmD(`มี ${bad.length} เหตุการณ์ที่ค่าเวลาไม่สมบูรณ์ ระบบจะข้ามรายการเหล่านี้\n\nกด "ยืนยัน" เพื่อส่งออกส่วนที่เหลือ`,'ข้ามรายการที่ผิด');
       if(!ok)return;
       plans=plans.filter(p=>!bad.includes(p));
