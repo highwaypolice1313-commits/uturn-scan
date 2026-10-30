@@ -320,6 +320,7 @@ canvas{max-width:100%;display:block;background:#000;border-radius:8px}
           <span id="pkCnt" class="mu"></span>
         </div>
         <div class="row">
+          <button id="pkSave">บันทึกผลเลือกภาพ</button>
           <button id="pkExport" class="pri" disabled>ส่งออกทั้งหมดที่เลือกไว้</button>
         </div>
       </div>
@@ -513,14 +514,20 @@ function loadVerdicts(){try{return JSON.parse(localStorage.uVerdict||'{}')}catch
 function saveVerdict(it,e){
   const m=loadVerdicts(),k=verdictKey(it,e);
   if(e.ok===null||e.ok===undefined)delete m[k];
-  else m[k]={ok:e.ok,plate:e.plate,picks:e.picks||null,pd:!!e.pickDone};
+  else m[k]={ok:e.ok,plate:e.plate,picks:e.picks||null,pd:!!e.pickDone,cars:e.cars||null};
   localStorage.uVerdict=JSON.stringify(m);
 }
 function applyVerdicts(it){
   const m=loadVerdicts();
   for(const e of it.events){
     const r=m[verdictKey(it,e)];
-    if(r){e.ok=r.ok;if(r.plate)e.plate=r.plate;if(r.picks)e.picks=r.picks;if(r.pd)e.pickDone=true}
+    if(r){
+      e.ok=r.ok;
+      if(r.plate)e.plate=r.plate;
+      if(r.picks)e.picks=r.picks;
+      if(r.pd)e.pickDone=true;
+      if(r.cars)e.cars=r.cars;
+    }
   }
 }
 const SET_IDS=['step','conf','mot','ang','pre','post','lvon','exall','idle','detail','fine','bestPlate','qual','incN'];
@@ -1121,7 +1128,7 @@ function serializeSession(){
     name:it.name,size:it.file.size,lastModified:it.file.lastModified,
     cat:it.cat,step:it.step,dur:it.dur,
     events:it.events.map(e=>({
-      ts:e.ts,te:e.te,ang:e.ang,ok:e.ok,plate:e.plate,auto:e.auto,picks:e.picks,pickDone:e.pickDone,
+      ts:e.ts,te:e.te,ang:e.ang,ok:e.ok,plate:e.plate,auto:e.auto,picks:e.picks,pickDone:e.pickDone,cars:e.cars||null,
       pts:e.pts.map(p=>({t:p.t,cx:p.cx,cy:p.cy,b:p.b,s:p.s}))
     }))
   }));
@@ -2073,6 +2080,7 @@ async function pkExportAll(){
     keepAlive(false);
   }
 }
+$('pkSave').onclick=saveSession;  
 $('pkExport').onclick=pkExportAll;
 
 // ---------- คีย์ลัด ----------
