@@ -91,6 +91,8 @@ canvas{max-width:100%;display:block;background:#000;border-radius:8px}
 .modal .btns{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
 .dlgtxt{white-space:pre-line;color:var(--tx);margin:6px 0 0;font-size:14px}
 #dlgI{width:100%;margin-top:12px}
+  
+#pkVc{max-width:100%;max-height:max(200px,min(calc(100vh - 400px),420px));width:auto;height:auto}
 </style>
 </head>
 <body>
@@ -126,7 +128,8 @@ canvas{max-width:100%;display:block;background:#000;border-radius:8px}
     <button class="tab on" data-v="queue">1. คิววิดีโอ</button>
     <button class="tab" data-v="zones">2. โซนกลับรถ</button>
     <button class="tab" data-v="review">3. ตรวจทานและส่งออก</button>
-    <button class="tab" data-v="ocr">4. อ่านทะเบียน</button>
+    <button class="tab" data-v="pick">4. เลือกภาพส่งออก</button>
+    <button class="tab" data-v="ocr">5. อ่านทะเบียน</button>
   </div>
 
   <!-- ===== คิว ===== -->
@@ -283,6 +286,48 @@ canvas{max-width:100%;display:block;background:#000;border-radius:8px}
     </div>
   </section>
 
+   <!-- ===== เลือกภาพส่งออก ===== -->
+  <section class="view" id="v-pick" hidden>
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <div class="row">
+          <label>หมวด <select id="pkCat"></select></label>
+          <label><input type="checkbox" id="pkOnly" checked> เฉพาะที่ยังไม่เลือกภาพ</label>
+          <span id="pkCnt" class="mu"></span>
+        </div>
+        <div class="row">
+          <button id="pkExport" class="pri" disabled>ส่งออกทั้งหมดที่เลือกไว้</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="rv">
+      <div class="card evpane"><div id="pkList"></div></div>
+      <div>
+        <div class="card">
+          <canvas id="pkVc" width="640" height="360"></canvas>
+          <input type="range" id="pkSl" style="width:100%;margin-top:8px">
+          <div id="pkInfo" class="mu" style="margin:4px 0 10px"></div>
+          <div class="row">
+            <button id="pkB1">ตั้งเป็นก่อนทำผิด (1)</button>
+            <button id="pkB2">ตั้งเป็นขณะทำผิด (2)</button>
+            <button id="pkB3">ตั้งเป็นภาพครอปทะเบียน (3)</button>
+          </div>
+          <div id="pkSum" class="mu" style="margin-top:10px"></div>
+        </div>
+        <div class="card">
+          <h2>ภาพครอปที่จะใช้เป็นช่อง 3</h2>
+          <canvas id="pkCrop" width="320" height="160"></canvas>
+          <div class="row" style="margin-top:10px">
+            <button id="pkSkip">ข้าม</button>
+            <button id="pkDone" class="pri">บันทึกและถัดไป (Enter)</button>
+          </div>
+          <div class="mu" style="margin-top:8px">← → ทีละเฟรม · Shift+← → ทีละ ~1 วิ · 1/2/3 ตั้งภาพปัจจุบันเป็นช่องนั้น · Enter บันทึกและถัดไป · ↑ ↓ เปลี่ยนเหตุการณ์</div>
+        </div>
+      </div>
+    </div>
+  </section> 
+
   <!-- ===== อ่านทะเบียน ===== -->
   <section class="view" id="v-ocr" hidden>
     <div class="card">
@@ -415,16 +460,16 @@ function loadVerdicts(){try{return JSON.parse(localStorage.uVerdict||'{}')}catch
 function saveVerdict(it,e){
   const m=loadVerdicts(),k=verdictKey(it,e);
   if(e.ok===null||e.ok===undefined)delete m[k];
-  else m[k]={ok:e.ok,plate:e.plate};
+  else m[k]={ok:e.ok,plate:e.plate,picks:e.picks||null,pd:!!e.pickDone};
   localStorage.uVerdict=JSON.stringify(m);
 }
 function applyVerdicts(it){
   const m=loadVerdicts();
   for(const e of it.events){
     const r=m[verdictKey(it,e)];
-    if(r){e.ok=r.ok;if(r.plate)e.plate=r.plate}
+    if(r){e.ok=r.ok;if(r.plate)e.plate=r.plate;if(r.picks)e.picks=r.picks;if(r.pd)e.pickDone=true}
   }
-}  
+}
 const SET_IDS=['step','conf','mot','ang','pre','post','lvon','exall','idle','detail','fine','bestPlate','qual','incN'];
 
 const ang=(a,b)=>Math.acos(Math.max(-1,Math.min(1,(a[0]*b[0]+a[1]*b[1])/((Math.hypot(...a)*Math.hypot(...b))||1))))*180/Math.PI;
@@ -1023,7 +1068,7 @@ function serializeSession(){
     name:it.name,size:it.file.size,lastModified:it.file.lastModified,
     cat:it.cat,step:it.step,dur:it.dur,
     events:it.events.map(e=>({
-      ts:e.ts,te:e.te,ang:e.ang,ok:e.ok,plate:e.plate,auto:e.auto,
+      ts:e.ts,te:e.te,ang:e.ang,ok:e.ok,plate:e.plate,auto:e.auto,picks:e.picks,pickDone:e.pickDone,
       pts:e.pts.map(p=>({t:p.t,cx:p.cx,cy:p.cy,b:p.b,s:p.s}))
     }))
   }));
@@ -1154,6 +1199,7 @@ function renderCats(){
   keepSel($('catSel'),opts);keepSel($('zcat'),opts);
   keepSel($('rvCat'),`<option value="all">ทุกหมวด</option>`+opts);
   keepSel($('ocCat'),`<option value="all">ทุกหมวด</option>`+opts);
+  keepSel($('pkCat'),`<option value="all">ทุกหมวด</option>`+opts);
 }
 $('cats').onclick=e=>{
   const ren=e.target.closest('[data-ren]'),del=e.target.closest('[data-del-cat]');
@@ -1222,6 +1268,7 @@ function renderAll(){
   renderCats();renderQueue();renderStats();updBtns();
   if(!$('v-review').hidden)renderReview();
   if(!$('v-ocr').hidden)renderOcr();
+  if(!$('v-pick').hidden)renderPick();
 }
 
 // ---------- แท็บ ----------
@@ -1231,6 +1278,7 @@ document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{
   if(b.dataset.v==='zones')zoneSync();
   if(b.dataset.v==='review'){renderReview();showRV()}
   if(b.dataset.v==='ocr')renderOcr();
+  if(b.dataset.v==='pick'){renderPick();if(!pkCurEv()&&pkQueue.length)pkSelect(pkQueue[0][0].id,pkQueue[0][1])}
 });
 $('lvon').addEventListener('change',()=>{refreshLiveBox();saveSet()});
 
@@ -1629,6 +1677,204 @@ $('expOne').onclick=()=>{
   return exportEvents([[it,e]]);
 };
 
+// ================= เลือกภาพสำหรับส่งออก (แท็บ 4) =================
+const PK_PAD=3;                 // เลื่อนดูได้ก่อน/หลังเหตุการณ์กี่วินาที
+let pk={id:null,k:-1,fi:0,tok:0};
+let pkQueue=[];
+
+const pkAll=()=>{const r=[];for(const it of items)if(it.status==='done')it.events.forEach((e,k)=>{if(e.ok===true)r.push([it,k])});return r};
+const pkCurIt=()=>items.find(i=>i.id===pk.id);
+const pkCurEv=()=>{const it=pkCurIt();return it?it.events[pk.k]:undefined};
+const pkBoxAt=(e,t)=>{if(!e.pts||!e.pts.length)return null;const q=nearPt(e.pts,t);return Math.abs(q.t-t)<=0.6?q:null};
+function pkDefaults(e){if(!e.picks)e.picks={b:Math.max(0,e.ts-1),d:(e.ts+e.te)/2,p:e.te}}
+
+// พื้นที่ครอปบริเวณกระจังหน้า (ส่วนล่างของกรอบรถ มีทะเบียนอยู่)
+function grilleRect(b){
+  const w=b.x2-b.x1,h=b.y2-b.y1;
+  return{x1:b.x1-w*.05,x2:b.x2+w*.05,y1:b.y1+h*.35,y2:b.y2+h*.1};
+}
+// ถ้า q เป็น null จะคืนภาพเต็ม
+function pkCropCanvas(bmp,q){
+  const cv=document.createElement('canvas');
+  if(!q){cv.width=bmp.width;cv.height=bmp.height;cv.getContext('2d').drawImage(bmp,0,0);return cv}
+  const r=grilleRect(q.b);
+  const sx=Math.max(0,Math.floor(r.x1)),sy=Math.max(0,Math.floor(r.y1));
+  const sw=Math.max(1,Math.min(bmp.width-sx,Math.ceil(r.x2-sx))),sh=Math.max(1,Math.min(bmp.height-sy,Math.ceil(r.y2-sy)));
+  cv.width=sw;cv.height=sh;cv.getContext('2d').drawImage(bmp,sx,sy,sw,sh,0,0,sw,sh);
+  return cv;
+}
+function canvasBlob(cv){
+  const full=$('qual').value==='full';
+  return new Promise(r=>full?cv.toBlob(r,'image/png'):cv.toBlob(r,'image/jpeg',parseFloat($('qual').value)||0.92));
+}
+const pkExt=()=>$('qual').value==='full'?'.png':'.jpg';
+
+function renderPick(){
+  const cf=$('pkCat').value,only=$('pkOnly').checked;
+  const all=pkAll();
+  pkQueue=all.filter(([it,k])=>(cf==='all'||it.cat===cf)&&(!only||!it.events[k].pickDone));
+  let h='';
+  pkQueue.forEach(([it,k],idx)=>{
+    const e=it.events[k],sel=pk.id===it.id&&pk.k===k?' sel':'';
+    h+=`<div class="ev${sel}${e.pickDone?' y':''}" data-pk="${idx}">#${idx+1} · ${esc(it.cat)} · ${fmtMS(e.ts)} → ${fmtMS(e.te)}<br><span class="mu">${esc(it.name)}${e.pickDone?' · เลือกภาพแล้ว':''}</span></div>`;
+  });
+  $('pkList').innerHTML=h||'<div class="empty">ยังไม่มีเหตุการณ์ที่ยืนยันแล้ว — ไปกด Y ในแท็บ 3 ก่อน</div>';
+  const done=all.filter(([it,k])=>it.events[k].pickDone).length;
+  $('pkCnt').textContent=`เลือกภาพแล้ว ${done}/${all.length}`;
+  $('pkExport').disabled=!done;
+}
+
+async function pkSelect(id,k){
+  pk.id=id;pk.k=k;
+  const it=pkCurIt(),e=pkCurEv();
+  if(!it||!e)return;
+  pkDefaults(e);
+  renderPick();
+  items.forEach(x=>{if(x!==it)releaseVid(x,'r')});
+  try{
+    const v=await ensureVid(it,'r');
+    const sl=$('pkSl');sl.step=RS;
+    sl.min=(Math.floor(Math.max(0,e.ts-PK_PAD)/RS)*RS).toFixed(3);
+    sl.max=(Math.floor(Math.min(v.duration-0.05,e.te+PK_PAD)/RS)*RS).toFixed(3);
+    await pkShow(e.picks.d);
+  }catch(err){$('pkInfo').textContent='เปิดวิดีโอไม่ได้: '+err.message}
+}
+async function pkShow(t){
+  const it=pkCurIt(),e=pkCurEv();if(!it||!e)return;
+  const tok=++pk.tok;
+  const lo=+$('pkSl').min,hi=+$('pkSl').max;
+  t=Math.min(Math.max(lo,Math.round(t/RS)*RS),hi);
+  pk.fi=t;$('pkSl').value=t;
+  try{
+    const v=await ensureVid(it,'r'),bmp=await getFrame(v,t);
+    if(tok!==pk.tok){bmp.close();return}
+    const c=$('pkVc');c.width=bmp.width;c.height=bmp.height;
+    const cx=c.getContext('2d');cx.drawImage(bmp,0,0);
+    const q=pkBoxAt(e,t);
+    if(q){cx.strokeStyle='#f5a524';cx.lineWidth=Math.max(3,bmp.width/250);cx.strokeRect(q.b.x1,q.b.y1,q.b.x2-q.b.x1,q.b.y2-q.b.y1)}
+    const cc=pkCropCanvas(bmp,q),pc=$('pkCrop');
+    pc.width=cc.width;pc.height=cc.height;pc.getContext('2d').drawImage(cc,0,0);
+    bmp.close();
+  }catch(err){$('pkInfo').textContent='ดึงภาพไม่ได้: '+err.message;return}
+  pkInfo();
+}
+function pkInfo(){
+  const it=pkCurIt(),e=pkCurEv();if(!it||!e)return;
+  const P=e.picks;
+  $('pkInfo').textContent=`ตำแหน่งปัจจุบัน ${fmtMS(pk.fi)} — ${it.name}`;
+  $('pkSum').textContent=`1 ก่อน: ${fmtMS(P.b)} · 2 ขณะ: ${fmtMS(P.d)} · 3 ครอป: ${fmtMS(P.p)}${e.pickDone?' ✔ บันทึกแล้ว':''}`;
+}
+function pkSet(key){
+  const it=pkCurIt(),e=pkCurEv();if(!it||!e)return;
+  pkDefaults(e);
+  e.picks[key]=pk.fi;
+  saveVerdict(it,e);
+  pkInfo();
+}
+function pkNextPending(afterIdx){
+  const all=pkAll();
+  return all.slice(afterIdx+1).find(([it,k])=>!it.events[k].pickDone)
+    ||all.find(([it,k])=>!it.events[k].pickDone)||null;
+}
+function pkDone(){
+  const it=pkCurIt(),e=pkCurEv();if(!it||!e)return;
+  pkDefaults(e);
+  e.pickDone=true;saveVerdict(it,e);
+  const all=pkAll(),i0=all.findIndex(([i2,k2])=>i2===it&&k2===pk.k);
+  const nx=pkNextPending(i0);
+  if(nx)pkSelect(nx[0].id,nx[1]);
+  else{renderPick();pkInfo();msg('เลือกภาพครบทุกเหตุการณ์แล้ว กดส่งออกได้เลย','เสร็จแล้ว')}
+}
+function pkSkip(){
+  const it=pkCurIt(),e=pkCurEv();if(!it||!e)return;
+  const all=pkAll(),i0=all.findIndex(([i2,k2])=>i2===it&&k2===pk.k);
+  const nx=pkNextPending(i0);
+  if(nx)pkSelect(nx[0].id,nx[1]);
+}
+
+async function pkExportAll(){
+  const list=pkAll().filter(([it,k])=>it.events[k].pickDone);
+  if(!list.length)return msg('ยังไม่มีเหตุการณ์ที่เลือกภาพครบ');
+  keepAlive(true);
+  const pv=new Map();
+  const getV=async it=>{if(!pv.has(it.id))pv.set(it.id,await openPrivate(it));return pv.get(it.id)};
+  const total=list.length*3;let done=0;
+  try{
+    let root;try{root=await showDirectoryPicker({mode:'readwrite',id:'uturn-out'})}catch(err){return}
+    expUI.open();
+    const vidDirs=new Map();
+    let csv='\ufeffหมวด,ไฟล์วิดีโอ,เหตุการณ์ที่,ภาพ1,ภาพ2,ภาพ3,ประเภทรถ,หมวดทะเบียน,เลข,จังหวัด,โฟลเดอร์\n';
+    for(const [it,k] of list){
+      const e=it.events[k],p=e.plate,P=e.picks,no=k+1;
+      const v=await getV(it);
+      const cdir=await root.getDirectoryHandle(safe(it.cat),{create:true});
+      if(!vidDirs.has(it.id)){
+        const vn=await uniqueName(cdir,safe(it.name.replace(/\.[^.]+$/,'')),'','dir');
+        vidDirs.set(it.id,await cdir.getDirectoryHandle(vn,{create:true}));
+      }
+      const vidDir=vidDirs.get(it.id);
+      const plateTxt=[p.f&&p.n?p.f+p.n:(p.f||p.n),p.v].filter(Boolean).join('-');
+      const evLabel=`เหตุการณ์${String(no).padStart(3,'0')}${plateTxt?'_'+safe(plateTxt):''}`;
+      const evDir=await vidDir.getDirectoryHandle(await uniqueName(vidDir,evLabel,'','dir'),{create:true});
+
+      const names=[];
+      const slots=[['b',1,'ก่อนกระทำผิด',false],['d',2,'ขณะกระทำผิด',false],['p',3,'ภาพครอปทะเบียน',true]];
+      for(const [key,slot,label,crop] of slots){
+        const t=P[key];
+        expUI.set(done/total,`${evLabel} · ภาพ ${slot}/3`);
+        const bmp=await getFrame(v,t);
+        const cv=pkCropCanvas(bmp,crop?pkBoxAt(e,t):null);
+        bmp.close();
+        const blob=await canvasBlob(cv);
+        const fn=`${no}.${slot} ${label} ${clockTag(it.name,t)}${pkExt()}`;
+        await writeBlob(evDir,fn,blob);
+        names.push(fn);done++;
+        expUI.set(done/total,`${evLabel} · ${done}/${total} · ${fn}`);
+      }
+      csv+=[it.cat,it.name,no,names[0],names[1],names[2],p.t,p.f,p.n,p.v,`${vidDir.name}/${evDir.name}`].map(csvq).join(',')+'\n';
+    }
+    const csvName=await uniqueName(root,'สรุปเลือกภาพ','.csv','file');
+    await writeBlob(root,csvName,new Blob([csv],{type:'text/csv'}));
+    expUI.done(`ส่งออกแล้ว ${list.length} เหตุการณ์ · ${done} ภาพ → ${root.name}\nไฟล์สรุป: ${csvName}`);
+  }catch(err){
+    console.error(err);
+    expUI.close();
+    await msg(`ส่งออกไม่สำเร็จหลังเขียนไป ${done}/${total} ภาพ\n${err.message||err}`,'ส่งออกไม่สำเร็จ');
+  }finally{
+    for(const v of pv.values())closePrivate(v);
+    keepAlive(false);
+  }
+}
+
+// ---------- ผูกปุ่มและคีย์ของแท็บ 4 ----------
+$('pkList').onclick=e=>{const d=e.target.closest('[data-pk]');if(!d)return;const [it,k]=pkQueue[+d.dataset.pk];pkSelect(it.id,k)};
+$('pkSl').oninput=e=>pkShow(+e.target.value);
+$('pkB1').onclick=()=>pkSet('b');
+$('pkB2').onclick=()=>pkSet('d');
+$('pkB3').onclick=()=>pkSet('p');
+$('pkDone').onclick=pkDone;
+$('pkSkip').onclick=pkSkip;
+$('pkExport').onclick=pkExportAll;
+$('pkCat').onchange=renderPick;
+$('pkOnly').onchange=renderPick;
+document.addEventListener('keydown',ev=>{
+  if($('v-pick').hidden||!$('dlg').hidden)return;
+  if(/INPUT|SELECT|TEXTAREA/.test(ev.target.tagName)&&ev.target.type!=='range')return;
+  const k=ev.key,big=ev.shiftKey?25:1;
+  if(k==='1')pkSet('b');
+  else if(k==='2')pkSet('d');
+  else if(k==='3')pkSet('p');
+  else if(k==='Enter'){ev.preventDefault();pkDone()}
+  else if(k==='ArrowRight'){ev.preventDefault();pkShow(pk.fi+RS*big)}
+  else if(k==='ArrowLeft'){ev.preventDefault();pkShow(pk.fi-RS*big)}
+  else if(k==='ArrowDown'||k==='ArrowUp'){
+    ev.preventDefault();
+    const idx=pkQueue.findIndex(([i2,k2])=>i2.id===pk.id&&k2===pk.k);
+    const nx=pkQueue[idx+(k==='ArrowDown'?1:-1)];
+    if(nx)pkSelect(nx[0].id,nx[1]);
+  }
+});
+  
 // ---------- เริ่มทำงาน ----------
 window.onbeforeunload=e=>{if(running||ocrBusy){e.preventDefault();e.returnValue=''}};
 $('provs').innerHTML=PROV.map(p=>`<option value="${p}">`).join('');
