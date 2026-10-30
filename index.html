@@ -2021,6 +2021,7 @@ $('pkCat').onchange=renderPick;
 $('pkOnly').onchange=renderPick;
 
 // ---------- ส่งออก: 1 คัน = 1 โฟลเดอร์เหตุการณ์ (ข้ามคันที่ skip) ----------
+// ---------- ส่งออก: ทุกภาพอยู่โฟลเดอร์เดียวกัน ชื่อไฟล์ไม่ซ้ำด้วยลำดับเหตุการณ์ (ข้ามคันที่ skip) ----------
 async function pkExportAll(){
   const list=pkAll().filter(x=>pkState(x)==='done');
   if(!list.length)return msg('ยังไม่มีคันที่ยืนยันภาพแล้ว');
@@ -2031,28 +2032,19 @@ async function pkExportAll(){
   try{
     let root;try{root=await showDirectoryPicker({mode:'readwrite',id:'uturn-out'})}catch(err){return}
     expUI.open();
-    const vidDirs=new Map();
-    let csv='\ufeffหมวด,ไฟล์วิดีโอ,ลำดับส่งออก,เหตุการณ์ที่ในไฟล์,คันที่,ภาพ1,ภาพ2,ภาพ3,ประเภทรถ,หมวดทะเบียน,เลข,จังหวัด,โฟลเดอร์\n';
+    // โฟลเดอร์เดียวสำหรับทุกภาพของการส่งออกนี้
+    const outDir=await root.getDirectoryHandle('ภาพเลือกส่งออก',{create:true});
+    let csv='\ufeffหมวด,ไฟล์วิดีโอ,ลำดับส่งออก,เหตุการณ์ที่ในไฟล์,คันที่,ภาพ1,ภาพ2,ภาพ3,ประเภทรถ,หมวดทะเบียน,เลข,จังหวัด\n';
     let no=0;
     for(const [it,k,ci] of list){
       no++;
       const e=it.events[k],c=pkCars(e)[ci],p=c.plate,P=c.picks;
       const v=await getV(it);
-      const cdir=await root.getDirectoryHandle(safe(it.cat),{create:true});
-      if(!vidDirs.has(it.id)){
-        const vn=await uniqueName(cdir,safe(it.name.replace(/\.[^.]+$/,'')),'','dir');
-        vidDirs.set(it.id,await cdir.getDirectoryHandle(vn,{create:true}));
-      }
-      const vidDir=vidDirs.get(it.id);
-      const plateTxt=[p.f&&p.n?p.f+p.n:(p.f||p.n),p.v].filter(Boolean).join('-');
-      const evLabel=`เหตุการณ์${String(no).padStart(3,'0')}${plateTxt?'_'+safe(plateTxt):''}`;
-      const evDir=await vidDir.getDirectoryHandle(await uniqueName(vidDir,evLabel,'','dir'),{create:true});
-
       const names=[];
       for(let si=0;si<PK_STEPS.length;si++){
         const {key,label}=PK_STEPS[si];
         const slot=si+1,crop=key==='p',t=P[key];
-        expUI.set(done/total,`${evLabel} · ภาพ ${slot}/3`);
+        expUI.set(done/total,`เหตุการณ์ ${no} · ภาพ ${slot}/3`);
         const bmp=await getFrame(v,t);
         const cv=pkCropCanvas(bmp,crop?carQ(e,c,t):null);
         bmp.close();
@@ -2060,16 +2052,18 @@ async function pkExportAll(){
         const blob=crop
           ? await canvasBlob(cv)
           : await new Promise(r=>cv.toBlob(r,'image/png'));
-        const fn=`${no}.${slot} ${label} ${clockTag(it.name,t)}${crop?pkExt():'.png'}`;
-        await writeBlob(evDir,fn,blob);
+        // ชื่อไฟล์: ลำดับเหตุการณ์.ลำดับภาพ + ป้าย + เวลา + ทะเบียน(ถ้ามี) ทำให้ไม่ซ้ำ
+        const plateTxt=[p.f&&p.n?p.f+p.n:(p.f||p.n),p.v].filter(Boolean).join('-');
+        const fn=`${no}.${slot} ${label} ${clockTag(it.name,t)}${plateTxt?' '+safe(plateTxt):''}${crop?pkExt():'.png'}`;
+        await writeBlob(outDir,fn,blob);
         names.push(fn);done++;
-        expUI.set(done/total,`${evLabel} · ${done}/${total} · ${fn}`);
+        expUI.set(done/total,`${done}/${total} · ${fn}`);
       }
-      csv+=[it.cat,it.name,no,k+1,ci+1,names[0],names[1],names[2],p.t,p.f,p.n,p.v,`${vidDir.name}/${evDir.name}`].map(csvq).join(',')+'\n';
+      csv+=[it.cat,it.name,no,k+1,ci+1,names[0],names[1],names[2],p.t,p.f,p.n,p.v].map(csvq).join(',')+'\n';
     }
-    const csvName=await uniqueName(root,'สรุปเลือกภาพ','.csv','file');
-    await writeBlob(root,csvName,new Blob([csv],{type:'text/csv'}));
-    expUI.done(`ส่งออกแล้ว ${list.length} เหตุการณ์ · ${done} ภาพ → ${root.name}\nไฟล์สรุป: ${csvName}`);
+    const csvName=await uniqueName(outDir,'สรุปเลือกภาพ','.csv','file');
+    await writeBlob(outDir,csvName,new Blob([csv],{type:'text/csv'}));
+    expUI.done(`ส่งออกแล้ว ${list.length} เหตุการณ์ · ${done} ภาพ → ${root.name}/ภาพเลือกส่งออก\nไฟล์สรุป: ${csvName}`);
   }catch(err){
     console.error(err);
     expUI.close();
