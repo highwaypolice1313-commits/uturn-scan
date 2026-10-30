@@ -91,6 +91,30 @@ canvas{max-width:100%;display:block;background:#000;border-radius:8px}
 .modal .btns{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
 .dlgtxt{white-space:pre-line;color:var(--tx);margin:6px 0 0;font-size:14px}
 #dlgI{width:100%;margin-top:12px}
+
+  /* ---- แท็บ 4: modal เลือกภาพ ---- */
+#pkModal{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:60;display:flex;align-items:center;justify-content:center;padding:10px}
+#pkModal[hidden]{display:none!important}
+.pkm-box{background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);width:min(1100px,100%);max-height:96vh;display:flex;flex-direction:column;overflow:hidden}
+.pkm-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;padding:12px 16px 4px}
+.pkm-title{font-weight:600;font-size:15px}
+.pkm-car{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:8px 16px;border-bottom:1px solid var(--bd)}
+.pkm-car input{width:120px}
+#pkmPv{width:150px}
+.pkm-steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding:10px 16px 4px}
+.pkm-step{text-align:left;padding:8px 10px;line-height:1.5}
+.pkm-step.on{border-color:var(--ac);background:#1a1608}
+.pkm-stage{min-height:140px;max-height:48vh;overflow:auto;background:#000;text-align:center;margin:8px 16px;border-radius:8px;padding:4px}
+#pkmVc{display:inline-block;vertical-align:top;max-width:100%;max-height:44vh;width:auto;height:auto;border-radius:4px;cursor:crosshair;touch-action:none}
+.pkm-stage.z{text-align:left}
+.pkm-stage.z #pkmVc{max-width:none;max-height:none}
+.pkm-crop{display:flex;gap:12px;align-items:center;padding:0 16px 6px}
+#pkmCrop{max-width:100%;max-height:14vh;width:auto;height:auto;background:#000;border-radius:6px}
+.pkm-bar{display:flex;gap:8px;align-items:center;padding:4px 16px}
+#pkmSl{flex:1}
+.pkm-time{font-weight:600;min-width:110px;text-align:right}
+.pkm-foot{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px 16px 12px;border-top:1px solid var(--bd)}
+.pkm-sp{flex:1}
   
 </style>
 </head>
@@ -285,7 +309,7 @@ canvas{max-width:100%;display:block;background:#000;border-radius:8px}
     </div>
   </section>
 
-   <!-- ===== เลือกภาพส่งออก ===== -->
+  <!-- ===== เลือกภาพส่งออก ===== -->
   <section class="view" id="v-pick" hidden>
     <div class="card">
       <div class="row" style="justify-content:space-between">
@@ -298,22 +322,10 @@ canvas{max-width:100%;display:block;background:#000;border-radius:8px}
           <button id="pkExport" class="pri" disabled>ส่งออกทั้งหมดที่เลือกไว้</button>
         </div>
       </div>
+      <div class="mu" style="margin-top:8px">คลิกเหตุการณ์เพื่อเปิดหน้าต่างเลือกภาพ 1 / 2 / 3 · เขียว = ยืนยันแล้ว · จาง = ข้าม</div>
     </div>
-
-    <div class="rv">
-      <div class="card evpane"><div id="pkList"></div></div>
-      <div>
-        <div class="card">
-          <div id="pkSteps"></div>
-          <div class="row" style="margin-top:10px">
-            <button id="pkSkip">ข้าม</button>
-            <button id="pkDone" class="pri">บันทึกคันนี้และถัดไป (Enter)</button>
-          </div>
-          <div class="mu" style="margin-top:8px">ใช้ปุ่ม "ดู / ตั้งภาพ" เพื่อเปิดหน้าต่างเลือกเฟรม · ↑ ↓ เปลี่ยนเหตุการณ์/คัน · Enter บันทึกคันนี้และถัดไป</div>
-        </div>
-      </div>
-    </div>
-  </section> 
+    <div class="card evpane"><div id="pkList"></div></div>
+  </section>
 
   <!-- ===== อ่านทะเบียน ===== -->
   <section class="view" id="v-ocr" hidden>
@@ -355,6 +367,59 @@ canvas{max-width:100%;display:block;background:#000;border-radius:8px}
     <div class="btns" id="dlgBtns"></div>
   </div>
 </div>
+
+<!-- ===== Modal เลือกภาพ 1/2/3 ของคันหนึ่ง ===== -->
+<div id="pkModal" hidden>
+  <div class="pkm-box">
+    <div class="pkm-head">
+      <div>
+        <div id="pkmTitle" class="pkm-title"></div>
+        <div id="pkmEvt" class="mu"></div>
+      </div>
+      <button id="pkmClose" class="icon" title="ปิด (Esc)">✕</button>
+    </div>
+
+    <div class="pkm-car">
+      <span id="pkmCarNo" class="mu"></span>
+      <input id="pkmPf" placeholder="หมวด เช่น กข">
+      <input id="pkmPn" placeholder="เลข เช่น 1234">
+      <input id="pkmPv" list="provs" placeholder="จังหวัด">
+      <button id="pkmAddCar">+ เพิ่มคันในเหตุการณ์นี้</button>
+      <button id="pkmDelCar" class="dng">ลบคันนี้</button>
+    </div>
+
+    <div class="pkm-steps" id="pkmSteps"></div>
+
+    <div class="pkm-stage" id="pkmStage"><canvas id="pkmVc"></canvas></div>
+
+    <div class="pkm-crop" id="pkmCropWrap" hidden>
+      <span class="mu">ภาพครอปที่จะใช้</span>
+      <canvas id="pkmCrop"></canvas>
+    </div>
+
+    <div class="pkm-bar">
+      <button id="pkmPrev">◀ −1 เฟรม</button>
+      <input id="pkmSl" type="range">
+      <button id="pkmNext">+1 เฟรม ▶</button>
+      <span id="pkmTime" class="pkm-time"></span>
+    </div>
+
+    <div class="pkm-foot">
+      <label><input type="checkbox" id="pkmZoom"> ขนาดจริง (เลื่อนดูได้)</label>
+      <span id="pkmHint" class="mu"></span>
+      <span class="pkm-sp"></span>
+      <button id="pkmClear">ล้างกรอบเอง</button>
+      <button id="pkmReset">คืนค่าเริ่มต้น</button>
+      <button id="pkmSetStep" class="pri">ตั้งภาพนี้</button>
+    </div>
+    <div class="pkm-foot">
+      <span id="pkmTip" class="mu"></span>
+      <span class="pkm-sp"></span>
+      <button id="pkmSkip" class="dng">ข้ามเหตุการณ์นี้</button>
+      <button id="pkmSave" class="pri">บันทึกและถัดไป (Enter)</button>
+    </div>
+  </div>
+</div>  
 
 <script>
 const $=id=>document.getElementById(id);
@@ -1265,7 +1330,7 @@ document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{
   if(b.dataset.v==='zones')zoneSync();
   if(b.dataset.v==='review'){renderReview();showRV()}
   if(b.dataset.v==='ocr')renderOcr();
-  if(b.dataset.v==='pick'){renderPick();if(!pkCurEv()&&pkQueue.length)pkSelect(pkQueue[0][0].id,pkQueue[0][1])}
+  if(b.dataset.v==='pick')renderPick();
 });
 $('lvon').addEventListener('change',()=>{refreshLiveBox();saveSet()});
 
@@ -1664,66 +1729,46 @@ $('expOne').onclick=()=>{
   return exportEvents([[it,e]]);
 };
 
-// ================= เลือกภาพสำหรับส่งออก (แท็บ 4) — เวอร์ชัน modal =================
-const PK_PAD=3;                                   // เลื่อนดูได้ก่อน/หลังเหตุการณ์กี่วินาที
-const PK_SLOTS=[['b','ระหว่างกระทำผิด'],['d','กระทำผิดแล้ว'],['p','ภาพครอปทะเบียน']];
-const PK_NO={b:1,d:2,p:3};
-const PK_TIP={
-  b:'เลือกเฟรมตอนรถกำลังทำผิด',
-  d:'เลือกเฟรมหลังทำผิด ที่เห็นรถเต็มคันชัด',
-  p:'เลือกเฟรมที่เห็นกระจังหน้าชัด แล้วลากกรอบคันรถ (ระบบครอปกระจังหน้าจากกรอบนี้)'
-};
-let pk={id:null,k:-1,ci:0,ptok:0};               // ci = ลำดับคันในเหตุการณ์
-let pkQueue=[];
-let pkM=null;                                     // สถานะ modal: {it,e,c,key,v,t,tok,base,drag}
-const pkThumbCache=new Map();
+// ================= เลือกภาพสำหรับส่งออก (แท็บ 4) =================
+const PK_PAD=3;                                    // เลื่อนดูได้ก่อน/หลังเหตุการณ์กี่วินาที
+const PK_STEPS=[
+  {key:'b',no:1,label:'ระหว่างกระทำผิด',tip:'เลือกเฟรมตอนรถกำลังทำผิด'},
+  {key:'d',no:2,label:'กระทำผิดแล้ว',tip:'เลือกเฟรมหลังทำผิด ที่เห็นรถเต็มคันชัด'},
+  {key:'p',no:3,label:'ภาพครอปทะเบียน',tip:'เลือกเฟรมที่เห็นกระจังหน้าชัด แล้วลากกรอบรอบรถ'}
+];
+let pkQueue=[];   // รายการที่แสดงทางซ้าย [it,k,ci]
+let pkM=null;     // modal ที่เปิดอยู่: {it,k,ci,e,c,step,v,t,tok,base,drag}
 
-// ---------- โครงสร้างข้อมูล: เหตุการณ์ 1 ครั้งมีได้หลายคัน (e.cars) ----------
-// ข้อมูลเก่าที่มีแค่ e.plate / e.picks จะถูกแปลงเป็นคันที่ 1 อัตโนมัติ
+// ---------- ข้อมูล: เหตุการณ์ 1 ครั้งมีได้หลายคัน (e.cars) ----------
+function pkDefault(e,key){return key==='b'?(e.ts+e.te)/2:e.te}
 function pkCars(e){
-  if(!e.cars){
-    e.cars=[{plate:{...(e.plate||{})},picks:e.picks?{...e.picks}:null,pset:{},pbox:null,pickDone:!!e.pickDone}];
-  }
-  e.cars.forEach(c=>pkCarDefaults(e,c));
+  if(!e.cars)e.cars=[{plate:{...(e.plate||{})},picks:e.picks?{...e.picks}:null,pset:{},pbox:null,pickDone:!!e.pickDone,skip:false}];
+  e.cars.forEach(c=>{
+    if(!c.picks)c.picks={b:pkDefault(e,'b'),d:pkDefault(e,'d'),p:pkDefault(e,'p')};
+    if(!c.pset)c.pset={};
+    if(c.pbox===undefined)c.pbox=null;
+    if(!c.plate)c.plate={t:'',f:'',n:'',v:''};
+    c.skip=!!c.skip;
+  });
   return e.cars;
 }
-function pkDefault(e,key){
-  if(key==='b')return (e.ts+e.te)/2;
-  if(key==='d')return e.te;
-  return e.te;
-}
-function pkCarDefaults(e,c){
-  if(!c.picks)c.picks={b:pkDefault(e,'b'),d:pkDefault(e,'d'),p:pkDefault(e,'p')};
-  if(!c.pset)c.pset={};
-  if(c.pbox===undefined)c.pbox=null;
-  if(!c.plate)c.plate={t:'',f:'',n:'',v:''};
-}
-function pkAddCar(it,e){
-  const first=e.cars[0];
-  const c={plate:{t:'',f:'',n:'',v:''},picks:{...first.picks},pset:{},pbox:null,pickDone:false};
-  e.cars.push(c);
-  return c;
-}
-
+// สถานะของคัน: pending = ยังไม่เลือก, done = ยืนยันแล้ว, skip = ข้าม
+const pkState=([it,k,ci])=>{const c=pkCars(it.events[k])[ci];return c.skip?'skip':c.pickDone?'done':'pending'};
 const pkAll=()=>{
   const r=[];
   for(const it of items)if(it.status==='done')
     it.events.forEach((e,k)=>{if(e.ok===true)pkCars(e).forEach((c,ci)=>r.push([it,k,ci]))});
   return r;
 };
-const pkCurIt=()=>items.find(i=>i.id===pk.id);
-const pkCurEv=()=>{const it=pkCurIt();return it?it.events[pk.k]:undefined};
-const pkCurCar=()=>{const e=pkCurEv();return e?pkCars(e)[pk.ci]:undefined};
+const pkVisible=()=>{const cf=$('pkCat').value;return pkAll().filter(([it])=>cf==='all'||it.cat===cf)};
 const pkBoxAt=(e,t)=>{if(!e.pts||!e.pts.length)return null;const q=nearPt(e.pts,t);return Math.abs(q.t-t)<=0.6?q:null};
-// กรอบที่ใช้จริง: ถ้าลากเองก่อน ใช้กรอบนั้น ไม่งั้นใช้กรอบอัตโนมัติ
+// กรอบที่ใช้จริง: ลากเองก่อน ไม่งั้นใช้กรอบอัตโนมัติ
 const carQ=(e,c,t)=>c.pbox?{b:c.pbox}:pkBoxAt(e,t);
 const pkNorm=(a,b)=>({x1:Math.min(a.x,b.x),y1:Math.min(a.y,b.y),x2:Math.max(a.x,b.x),y2:Math.max(a.y,b.y)});
 function pkStroke(cx,b,w,color='#f5a524'){
   cx.strokeStyle=color;cx.lineWidth=Math.max(3,w/250);
   cx.strokeRect(b.x1,b.y1,b.x2-b.x1,b.y2-b.y1);
 }
-
-// พื้นที่ครอปบริเวณกระจังหน้า (ส่วนล่างของกรอบรถ มีทะเบียนอยู่)
 function grilleRect(b){
   const w=b.x2-b.x1,h=b.y2-b.y1;
   return{x1:b.x1-w*.05,x2:b.x2+w*.05,y1:b.y1+h*.35,y2:b.y2+h*.1};
@@ -1744,200 +1789,96 @@ function canvasBlob(cv){
 }
 const pkExt=()=>$('qual').value==='full'?'.png':'.jpg';
 
-// ---------- รายการเหตุการณ์/คันทางซ้าย ----------
+// ---------- รายการทางซ้าย ----------
 function renderPick(){
-  const cf=$('pkCat').value,only=$('pkOnly').checked;
+  const only=$('pkOnly').checked;
   const all=pkAll();
-  pkQueue=all.filter(([it,k,ci])=>{
-    const c=pkCars(it.events[k])[ci];
-    return (cf==='all'||it.cat===cf)&&(!only||!c.pickDone);
-  });
+  pkQueue=pkVisible().filter(x=>!only||pkState(x)==='pending');
   let h='';
-  pkQueue.forEach(([it,k,ci],idx)=>{
-    const e=it.events[k],c=e.cars[ci];
-    const sel=pk.id===it.id&&pk.k===k&&pk.ci===ci?' sel':'';
+  pkQueue.forEach((x,idx)=>{
+    const [it,k,ci]=x,e=it.events[k],c=pkCars(e)[ci],st=pkState(x);
+    const sel=pkM&&pkM.it===it&&pkM.k===k&&pkM.ci===ci?' sel':'';
+    const cls=st==='done'?' y':st==='skip'?' n':'';
     const multi=e.cars.length>1?` · คันที่ ${ci+1}/${e.cars.length}`:'';
     const plate=[c.plate.f&&c.plate.n?c.plate.f+c.plate.n:(c.plate.f||c.plate.n),c.plate.v].filter(Boolean).join('-');
-    h+=`<div class="ev${sel}${c.pickDone?' y':''}" data-pk="${idx}">#${idx+1} · ${esc(it.cat)} · ${fmtMS(e.ts)} → ${fmtMS(e.te)}${multi}<br><span class="mu">${esc(plate||'ยังไม่มีทะเบียน')} · ${esc(it.name)}${c.pickDone?' · เลือกภาพแล้ว':''}</span></div>`;
+    const stTxt=st==='done'?' · ✔ ยืนยันแล้ว':st==='skip'?' · ข้ามแล้ว':'';
+    h+=`<div class="ev${sel}${cls}" data-pk="${idx}">#${idx+1} · ${esc(it.cat)} · ${fmtMS(e.ts)} → ${fmtMS(e.te)}${multi}<br><span class="mu">${esc(plate||'ยังไม่มีทะเบียน')} · ${esc(it.name)}${stTxt}</span></div>`;
   });
-  $('pkList').innerHTML=h||'<div class="empty">ยังไม่มีเหตุการณ์ที่ยืนยันแล้ว — ไปกด Y ในแท็บ 3 ก่อน</div>';
-  const done=all.filter(([it,k,ci])=>pkCars(it.events[k])[ci].pickDone).length;
-  $('pkCnt').textContent=`เลือกภาพแล้ว ${done}/${all.length} (นับต่อคัน)`;
-  $('pkExport').disabled=!done;
+  $('pkList').innerHTML=h||'<div class="empty">ไม่มีรายการให้แสดง — ต้องกด Y ยืนยันเหตุการณ์ในแท็บ 3 ก่อน หรือปิดตัวกรอง "เฉพาะที่ยังไม่เลือกภาพ"</div>';
+  const ok=all.filter(x=>pkState(x)==='done').length,sk=all.filter(x=>pkState(x)==='skip').length;
+  $('pkCnt').textContent=`ยืนยันแล้ว ${ok} · ข้าม ${sk} · ทั้งหมด ${all.length} (นับต่อคัน)`;
+  $('pkExport').disabled=!ok;
 }
 
-// ---------- เลือกคัน ----------
-function pkSelect(id,k,ci=0){
-  pk.id=id;pk.k=k;pk.ci=ci;
-  if(!pkCurCar())return;
-  items.forEach(x=>{if(x!==pkCurIt())releaseVid(x,'r')});
-  renderPick();
-  pkRenderSteps();
-}
-
-// ---------- แผงคัน + แถวภาพ 1/2/3 ----------
-function pkRenderSteps(){
-  const el=$('pkSteps');if(!el)return;
-  const it=pkCurIt(),e=pkCurEv(),c=pkCurCar();
-  if(!it||!e||!c){el.innerHTML='';return}
-  const tok=++pk.ptok;
-  const p=c.plate;
-  let h=`<div class="pk-head">
-    <b>คันที่ ${pk.ci+1}/${e.cars.length} · ${fmtMS(e.ts)} → ${fmtMS(e.te)}</b>
-    <button data-act="addcar">+ เพิ่มคันในเหตุการณ์นี้</button>
-    ${e.cars.length>1?'<button data-act="delcar">ลบคันนี้</button>':''}
-  </div>
-  <div class="pk-plate">
-    <input data-plate="f" placeholder="หมวด เช่น กข" value="${esc(p.f||'')}">
-    <input data-plate="n" placeholder="เลข เช่น 1234" value="${esc(p.n||'')}">
-    <input data-plate="v" placeholder="จังหวัด" value="${esc(p.v||'')}">
-  </div>`;
-  for(const [key,label] of PK_SLOTS){
-    const t=c.picks[key],isSet=!!c.pset[key];
-    h+=`<div class="pk-row">
-      <img data-th="${key}" class="pk-th" alt="">
-      <div class="pk-meta">
-        <b>ภาพ ${PK_NO[key]} · ${label}</b>
-        <div>${fmtMS(t)} <span class="mu">${isSet?'ตั้งเอง':'ค่าเริ่มต้น'}</span></div>
-        <div class="mu">${PK_TIP[key]}</div>
-        <div class="pk-btns">
-          <button data-act="open" data-key="${key}">ดู / ตั้งภาพ</button>
-          <button data-act="reset" data-key="${key}">คืนค่าเริ่มต้น</button>
-        </div>
-      </div>
-    </div>`;
-  }
-  h+=`<div class="pk-hint">${c.pbox
-    ?'กรอบคันรถที่ลากเอง ใช้กับภาพ 3 ของคันนี้'
-    :'ยังไม่มีกรอบเอง ภาพ 3 ใช้กรอบอัตโนมัติ (ถ้าไม่มีจะเป็นภาพเต็ม)'}</div>`;
-  el.innerHTML=h;
-  pkFillThumbs(it,e,c,tok);
-}
-async function pkFillThumbs(it,e,c,tok){
-  for(const [key] of PK_SLOTS){
-    const img=$('pkSteps')?.querySelector(`[data-th="${key}"]`);
-    if(!img)continue;
-    try{
-      const url=await pkThumbUrl(it,e,c,key);
-      if(tok!==pk.ptok)return;
-      img.src=url;
-    }catch(err){img.alt='ดึงภาพไม่ได้'}
-  }
-}
-async function pkThumbUrl(it,e,c,key){
-  const t=c.picks[key];
-  const q=key==='p'?carQ(e,c,t):null;
-  const ck=[it.id,pk.k,pk.ci,key,t,JSON.stringify(q?q.b:null)].join('|');
-  if(pkThumbCache.has(ck))return pkThumbCache.get(ck);
-  const v=await ensureVid(it,'r'),bmp=await getFrame(v,t);
-  const cv=pkCropCanvas(bmp,q);bmp.close();
-  const s=Math.min(1,320/cv.width);
-  const sm=document.createElement('canvas');
-  sm.width=Math.max(1,Math.round(cv.width*s));sm.height=Math.max(1,Math.round(cv.height*s));
-  sm.getContext('2d').drawImage(cv,0,0,sm.width,sm.height);
-  const url=sm.toDataURL('image/jpeg',0.9);
-  pkThumbCache.set(ck,url);
-  return url;
-}
-
-// ---------- Modal เลือกภาพ ----------
-function pkEnsureModal(){
-  if($('pkModal'))return;
-  const d=document.createElement('div');
-  d.id='pkModal';
-  d.innerHTML=`<div class="pkm-box">
-    <div class="pkm-top"><b id="pkmTitle"></b><span id="pkmTime"></span></div>
-    <div class="pkm-stage" id="pkmStage"><canvas id="pkmVc"></canvas></div>
-    <div class="pkm-bar">
-      <button id="pkmPrev">◀ −1 วิ</button>
-      <input id="pkmSl" type="range">
-      <button id="pkmNext">+1 วิ ▶</button>
-    </div>
-    <div class="pkm-crop" id="pkmCropWrap"><span class="mu">ภาพครอปที่จะบันทึก</span><canvas id="pkmCrop"></canvas></div>
-    <div class="pkm-foot">
-      <label><input type="checkbox" id="pkmZoom"> ขนาดจริง (เลื่อนดูได้)</label>
-      <span id="pkmHint" class="mu"></span>
-      <span class="pkm-sp"></span>
-      <button id="pkmClear">ล้างกรอบเอง</button>
-      <button id="pkmCancel">ยกเลิก</button>
-      <button id="pkmOk" class="pri">ตกลง ตั้งภาพนี้</button>
-    </div>
-  </div>`;
-  document.body.appendChild(d);
-  $('pkmPrev').onclick=()=>{if(pkM)pkMShow(pkM.t-1)};
-  $('pkmNext').onclick=()=>{if(pkM)pkMShow(pkM.t+1)};
-  $('pkmSl').oninput=ev=>{if(pkM)pkMShow(+ev.target.value)};
-  $('pkmZoom').onchange=ev=>$('pkmStage').classList.toggle('z',ev.target.checked);
-  $('pkmCancel').onclick=pkMClose;
-  $('pkmOk').onclick=pkMConfirm;
-  $('pkmClear').onclick=()=>{
-    if(!pkM)return;
-    pkM.c.pbox=null;saveVerdict(pkM.it,pkM.e);
-    pkMShow(pkM.t);pkRenderSteps();
-  };
-  d.onclick=ev=>{if(ev.target===d)pkMClose()};
-
-  // ลากกรอบคันรถบนภาพ (เฉพาะภาพ 3)
-  const vc=$('pkmVc');
-  const pt=ev=>{const r=vc.getBoundingClientRect();return{x:(ev.clientX-r.left)*vc.width/r.width,y:(ev.clientY-r.top)*vc.height/r.height}};
-  vc.style.touchAction='none';
-  vc.style.cursor='crosshair';
-  vc.onpointerdown=ev=>{
-    if(!pkM||pkM.key!=='p'||!pkM.base)return;
-    pkM.drag=pt(ev);vc.setPointerCapture(ev.pointerId);
-  };
-  vc.onpointermove=ev=>{
-    if(!pkM||!pkM.drag)return;
-    const cx=vc.getContext('2d');
-    cx.drawImage(pkM.base,0,0);
-    pkStroke(cx,pkNorm(pkM.drag,pt(ev)),vc.width,'#22c55e');
-  };
-  vc.onpointerup=ev=>{
-    if(!pkM||!pkM.drag)return;
-    const b=pkNorm(pkM.drag,pt(ev));pkM.drag=null;
-    if(b.x2-b.x1<10||b.y2-b.y1<10){pkMShow(pkM.t);return}   // คลิกเฉย ๆ ไม่ถือเป็นการวาด
-    pkM.c.pbox=b;saveVerdict(pkM.it,pkM.e);
-    pkMShow(pkM.t);pkRenderSteps();
-  };
-}
-async function pkMOpen(key){
-  const it=pkCurIt(),e=pkCurEv(),c=pkCurCar();if(!it||!e||!c)return;
-  pkEnsureModal();
-  let v;
-  try{v=await ensureVid(it,'r')}
-  catch(err){return msg('เปิดวิดีโอไม่ได้: '+err.message)}
+// ---------- เปิด/ปิด modal ----------
+async function pkOpen(it,k,ci,step=0){
+  const e=it.events[k],c=pkCars(e)[ci];
+  pkM={it,k,ci,e,c,step,v:null,t:0,tok:0,base:null,drag:null};
+  const cur=pkM;
+  $('pkModal').hidden=false;
+  pkFill();
+  items.forEach(x=>{if(x!==it)releaseVid(x,'r')});
+  try{cur.v=await ensureVid(it,'r')}
+  catch(err){if(pkM===cur)pkClose();return msg('เปิดวิดีโอไม่ได้: '+err.message)}
+  if(pkM!==cur)return;
   const sl=$('pkmSl');
   sl.step=RS;
   sl.min=(Math.floor(Math.max(0,e.ts-PK_PAD)/RS)*RS).toFixed(3);
-  sl.max=(Math.floor(Math.min(v.duration-0.05,e.te+PK_PAD)/RS)*RS).toFixed(3);
-  pkM={it,e,c,key,v,t:0,tok:0,base:null,drag:null};
-  $('pkmTitle').textContent=`ภาพ ${PK_NO[key]} · ${PK_SLOTS.find(s=>s[0]===key)[1]} · ${it.name}`;
-  $('pkmCropWrap').style.display=key==='p'?'flex':'none';
-  $('pkmClear').style.display=key==='p'?'':'none';
-  $('pkmStage').classList.toggle('z',$('pkmZoom').checked);
-  $('pkModal').classList.add('on');
-  await pkMShow(c.picks[key]);
+  sl.max=(Math.floor(Math.min(cur.v.duration-0.05,e.te+PK_PAD)/RS)*RS).toFixed(3);
+  await pkShow(c.picks[PK_STEPS[step].key]);
 }
-async function pkMShow(t){
-  if(!pkM)return;
-  const {it,e,c,key,v}=pkM;
-  const tok=++pkM.tok;
+function pkClose(){
+  pkM=null;
+  $('pkModal').hidden=true;
+  renderPick();
+}
+
+// ---------- เติมข้อมูลหัว modal และสรุปภาพ 1/2/3 ----------
+function pkFill(){
+  const m=pkM;if(!m)return;
+  const cars=pkCars(m.e),S=PK_STEPS[m.step];
+  $('pkmTitle').textContent=m.it.name;
+  $('pkmEvt').textContent=`${m.it.cat} · เหตุการณ์ ${fmtMS(m.e.ts)} → ${fmtMS(m.e.te)}`;
+  $('pkmCarNo').textContent=`คันที่ ${m.ci+1}/${cars.length}`;
+  $('pkmPf').value=m.c.plate.f||'';
+  $('pkmPn').value=m.c.plate.n||'';
+  $('pkmPv').value=m.c.plate.v||'';
+  $('pkmDelCar').hidden=cars.length<2;
+  $('pkmSteps').innerHTML=PK_STEPS.map((s,i)=>{
+    const set=!!m.c.pset[s.key];
+    return `<button class="pkm-step${i===m.step?' on':''}" data-step="${i}">
+      <b>ภาพ ${s.no} · ${s.label}</b><br>
+      <span>${fmtMS(m.c.picks[s.key])}</span>
+      <span class="mu">${set?'ตั้งเอง':'ค่าเริ่มต้น'}</span></button>`;
+  }).join('');
+  $('pkmSetStep').textContent=`ตั้งภาพนี้เป็นภาพ ${S.no} (Space)`;
+  $('pkmTip').textContent=S.tip;
+  $('pkmSkip').textContent=m.c.skip?'ยกเลิกการข้าม':'ข้ามเหตุการณ์นี้';
+  $('pkmSave').textContent=m.c.skip?'บันทึกและถัดไป (Enter)':'บันทึกและถัดไป (Enter)';
+  $('pkmClear').hidden=S.key!=='p';
+  $('pkmCropWrap').hidden=S.key!=='p';
+}
+
+// ---------- แสดงเฟรมความละเอียดเต็ม ----------
+async function pkShow(t){
+  const m=pkM;if(!m||!m.v)return;
+  const tok=++m.tok;
   const sl=$('pkmSl');
   const lo=+sl.min,hi=+sl.max;
   t=Math.min(Math.max(lo,Math.round(t/RS)*RS),hi);
-  pkM.t=t;sl.value=t;
+  m.t=t;sl.value=t;
   $('pkmTime').textContent=fmtMS(t);
+  const key=PK_STEPS[m.step].key;
   try{
-    const bmp=await getFrame(v,t);
-    if(!pkM||tok!==pkM.tok){bmp.close();return}
+    const bmp=await getFrame(m.v,t);
+    if(pkM!==m||tok!==m.tok){bmp.close();return}
     const vc=$('pkmVc');vc.width=bmp.width;vc.height=bmp.height;
     const cx=vc.getContext('2d');
     cx.drawImage(bmp,0,0);
-    pkM.base=document.createElement('canvas');
-    pkM.base.width=vc.width;pkM.base.height=vc.height;
-    pkM.base.getContext('2d').drawImage(vc,0,0);
-    const q=key==='p'?carQ(e,c,t):null;
-    if(q)pkStroke(cx,q.b,bmp.width,c.pbox?'#22c55e':'#f5a524');
+    m.base=document.createElement('canvas');m.base.width=vc.width;m.base.height=vc.height;
+    m.base.getContext('2d').drawImage(vc,0,0);
+    const q=key==='p'?carQ(m.e,m.c,t):null;
+    if(q)pkStroke(cx,q.b,bmp.width,m.c.pbox?'#22c55e':'#f5a524');
     if(key==='p'){
       const cc=pkCropCanvas(bmp,q),pc=$('pkmCrop');
       pc.width=cc.width;pc.height=cc.height;
@@ -1945,77 +1886,143 @@ async function pkMShow(t){
     }
     bmp.close();
     $('pkmHint').textContent=key==='p'
-      ?(q?(c.pbox?'กรอบเขียว = ลากเอง':'กรอบส้ม = อัตโนมัติ'):'ไม่พบกรอบ ใช้ภาพเต็ม ลากเมาส์เพื่อวาดกรอบ')
+      ?(q?(m.c.pbox?'กรอบเขียว = ลากเอง':'กรอบส้ม = อัตโนมัติ'):'ไม่พบกรอบ ลากเมาส์บนภาพเพื่อวาดกรอบ')
       :'';
   }catch(err){$('pkmHint').textContent='ดึงภาพไม่ได้: '+err.message}
 }
-function pkMConfirm(){
-  if(!pkM)return;
-  const {it,e,c,key,t}=pkM;
-  c.picks[key]=t;c.pset[key]=true;
-  saveVerdict(it,e);
-  pkMClose();
-  renderPick();pkRenderSteps();
-}
-function pkMClose(){
-  pkM=null;
-  const m=$('pkModal');if(m)m.classList.remove('on');
+async function pkSwitchStep(i){
+  const m=pkM;if(!m)return;
+  m.step=i;pkFill();
+  await pkShow(m.c.picks[PK_STEPS[i].key]);
 }
 
-// ---------- ปุ่มย่อยในแผงคัน ----------
-$('pkSteps').onclick=async ev=>{
-  const b=ev.target.closest('[data-act]');if(!b)return;
-  const it=pkCurIt(),e=pkCurEv(),c=pkCurCar();if(!it||!e||!c)return;
-  const key=b.dataset.key,act=b.dataset.act;
-  if(act==='open')return pkMOpen(key);
-  if(act==='reset'){
-    c.picks[key]=pkDefault(e,key);delete c.pset[key];
-    saveVerdict(it,e);renderPick();return pkRenderSteps();
-  }
-  if(act==='addcar'){
-    const nc=pkAddCar(it,e);saveVerdict(it,e);
-    return pkSelect(it.id,pk.k,e.cars.indexOf(nc));
-  }
-  if(act==='delcar'){
-    if(!confirm('ลบคันนี้ออกจากเหตุการณ์นี้?'))return;
-    e.cars.splice(pk.ci,1);saveVerdict(it,e);
-    return pkSelect(it.id,pk.k,Math.max(0,pk.ci-1));
-  }
-};
-// แก้ทะเบียนของแต่ละคัน
-$('pkSteps').onchange=ev=>{
-  const f=ev.target.dataset.plate;if(!f)return;
-  const it=pkCurIt(),e=pkCurEv(),c=pkCurCar();if(!c)return;
-  c.plate[f]=ev.target.value.trim();
-  saveVerdict(it,e);
+// ---------- ตั้งภาพ / คืนค่า / ล้างกรอบ ----------
+function pkConfirmStep(){
+  const m=pkM;if(!m)return;
+  const key=PK_STEPS[m.step].key;
+  m.c.picks[key]=m.t;m.c.pset[key]=true;
+  saveVerdict(m.it,m.e);
   renderPick();
+  if(m.step<PK_STEPS.length-1)pkSwitchStep(m.step+1);else pkFill();
+}
+async function pkResetStep(){
+  const m=pkM;if(!m)return;
+  const key=PK_STEPS[m.step].key;
+  m.c.picks[key]=pkDefault(m.e,key);delete m.c.pset[key];
+  saveVerdict(m.it,m.e);renderPick();pkFill();
+  await pkShow(m.c.picks[key]);
+}
+async function pkClearBox(){
+  const m=pkM;if(!m)return;
+  m.c.pbox=null;saveVerdict(m.it,m.e);renderPick();
+  await pkShow(m.t);
+}
+
+// ---------- บันทึก / ข้าม / ถัดไป ----------
+function pkNextAfter(it,k,ci){
+  const vis=pkVisible();
+  const i0=vis.findIndex(([i2,k2,c2])=>i2===it&&k2===k&&c2===ci);
+  const pend=x=>pkState(x)==='pending';
+  return vis.slice(i0+1).find(pend)||vis.find(pend)||null;
+}
+function pkAdvance(it,k,ci){
+  const nx=pkNextAfter(it,k,ci);
+  renderPick();
+  if(nx)pkOpen(nx[0],nx[1],nx[2]);
+  else{pkClose();msg('ไม่มีคันที่ยังไม่เลือกภาพแล้ว — กดส่งออกได้เลย','เสร็จแล้ว')}
+}
+function pkSaveCar(){
+  const m=pkM;if(!m)return;
+  m.c.pickDone=true;m.c.skip=false;
+  saveVerdict(m.it,m.e);
+  pkAdvance(m.it,m.k,m.ci);
+}
+function pkToggleSkip(){
+  const m=pkM;if(!m)return;
+  if(m.c.skip){
+    m.c.skip=false;saveVerdict(m.it,m.e);renderPick();pkFill();return;
+  }
+  m.c.skip=true;m.c.pickDone=false;
+  saveVerdict(m.it,m.e);
+  pkAdvance(m.it,m.k,m.ci);
+}
+
+// ---------- เพิ่ม/ลบคัน และแก้ทะเบียน ----------
+function pkAddCar(){
+  const m=pkM;if(!m)return;
+  const cars=pkCars(m.e);
+  cars.push({plate:{t:'',f:'',n:'',v:''},picks:{...cars[0].picks},pset:{},pbox:null,pickDone:false,skip:false});
+  saveVerdict(m.it,m.e);
+  pkOpen(m.it,m.k,cars.length-1);
+}
+async function pkDelCar(){
+  const m=pkM;if(!m)return;
+  if(!await confirmD('ลบคันนี้ออกจากเหตุการณ์นี้?'))return;
+  const cars=pkCars(m.e);
+  cars.splice(m.ci,1);
+  saveVerdict(m.it,m.e);
+  pkOpen(m.it,m.k,Math.max(0,m.ci-1));
+}
+[['pkmPf','f'],['pkmPn','n'],['pkmPv','v']].forEach(([id,f])=>{
+  $(id).addEventListener('input',ev=>{
+    if(!pkM)return;
+    pkM.c.plate[f]=ev.target.value.trim();
+    saveVerdict(pkM.it,pkM.e);
+    renderPick();
+  });
+});
+
+// ---------- ลากกรอบคันรถบนภาพ (เฉพาะภาพ 3) ----------
+const pkVcEl=$('pkmVc');
+const pkPt=ev=>{const r=pkVcEl.getBoundingClientRect();return{x:(ev.clientX-r.left)*pkVcEl.width/r.width,y:(ev.clientY-r.top)*pkVcEl.height/r.height}};
+pkVcEl.onpointerdown=ev=>{
+  if(!pkM||!pkM.base||PK_STEPS[pkM.step].key!=='p')return;
+  pkM.drag=pkPt(ev);pkVcEl.setPointerCapture(ev.pointerId);
+};
+pkVcEl.onpointermove=ev=>{
+  if(!pkM||!pkM.drag)return;
+  const cx=pkVcEl.getContext('2d');
+  cx.drawImage(pkM.base,0,0);
+  pkStroke(cx,pkNorm(pkM.drag,pkPt(ev)),pkVcEl.width,'#22c55e');
+};
+pkVcEl.onpointerup=ev=>{
+  if(!pkM||!pkM.drag)return;
+  const b=pkNorm(pkM.drag,pkPt(ev));pkM.drag=null;
+  if(b.x2-b.x1<10||b.y2-b.y1<10){pkShow(pkM.t);return}   // คลิกเฉย ๆ ไม่ถือเป็นการวาด
+  pkM.c.pbox=b;saveVerdict(pkM.it,pkM.e);
+  renderPick();
+  pkShow(pkM.t);
 };
 
-// ---------- ยืนยันคัน / ข้าม ----------
-function pkNextPending(afterIdx){
-  const all=pkAll();
-  const pend=([it,k,ci])=>!pkCars(it.events[k])[ci].pickDone;
-  return all.slice(afterIdx+1).find(pend)||all.find(pend)||null;
-}
-function pkDone(){
-  const it=pkCurIt(),e=pkCurEv(),c=pkCurCar();if(!c)return;
-  c.pickDone=true;saveVerdict(it,e);
-  const all=pkAll(),i0=all.findIndex(([i2,k2,ci2])=>i2===it&&k2===pk.k&&ci2===pk.ci);
-  const nx=pkNextPending(i0);
-  if(nx)pkSelect(nx[0].id,nx[1],nx[2]);
-  else{renderPick();pkRenderSteps();msg('เลือกภาพครบทุกคันทุกเหตุการณ์แล้ว กดส่งออกได้เลย','เสร็จแล้ว')}
-}
-function pkSkip(){
-  const it=pkCurIt(),e=pkCurEv();if(!it||!e)return;
-  const all=pkAll(),i0=all.findIndex(([i2,k2,ci2])=>i2===it&&k2===pk.k&&ci2===pk.ci);
-  const nx=pkNextPending(i0);
-  if(nx)pkSelect(nx[0].id,nx[1],nx[2]);
-}
+// ---------- ปุ่มใน modal ----------
+$('pkmClose').onclick=pkClose;
+$('pkModal').onclick=ev=>{if(ev.target.id==='pkModal')pkClose()};
+$('pkmPrev').onclick=()=>{if(pkM)pkShow(pkM.t-RS)};
+$('pkmNext').onclick=()=>{if(pkM)pkShow(pkM.t+RS)};
+$('pkmSl').oninput=ev=>{if(pkM)pkShow(+ev.target.value)};
+$('pkmZoom').onchange=ev=>$('pkmStage').classList.toggle('z',ev.target.checked);
+$('pkmSetStep').onclick=pkConfirmStep;
+$('pkmReset').onclick=pkResetStep;
+$('pkmClear').onclick=pkClearBox;
+$('pkmSkip').onclick=pkToggleSkip;
+$('pkmSave').onclick=pkSaveCar;
+$('pkmAddCar').onclick=pkAddCar;
+$('pkmDelCar').onclick=pkDelCar;
+$('pkmSteps').onclick=ev=>{const b=ev.target.closest('[data-step]');if(b&&pkM)pkSwitchStep(+b.dataset.step)};
 
-// ---------- ส่งออก: 1 คัน = 1 โฟลเดอร์เหตุการณ์ ----------
+// ---------- รายการทางซ้าย ----------
+$('pkList').onclick=ev=>{
+  const d=ev.target.closest('[data-pk]');if(!d)return;
+  const [it,k,ci]=pkQueue[+d.dataset.pk];
+  pkOpen(it,k,ci);
+};
+$('pkCat').onchange=renderPick;
+$('pkOnly').onchange=renderPick;
+
+// ---------- ส่งออก: 1 คัน = 1 โฟลเดอร์เหตุการณ์ (ข้ามคันที่ skip) ----------
 async function pkExportAll(){
-  const list=pkAll().filter(([it,k,ci])=>pkCars(it.events[k])[ci].pickDone);
-  if(!list.length)return msg('ยังไม่มีคันที่เลือกภาพครบ');
+  const list=pkAll().filter(x=>pkState(x)==='done');
+  if(!list.length)return msg('ยังไม่มีคันที่ยืนยันภาพแล้ว');
   keepAlive(true);
   const pv=new Map();
   const getV=async it=>{if(!pv.has(it.id))pv.set(it.id,await openPrivate(it));return pv.get(it.id)};
@@ -2025,10 +2032,10 @@ async function pkExportAll(){
     expUI.open();
     const vidDirs=new Map();
     let csv='\ufeffหมวด,ไฟล์วิดีโอ,ลำดับส่งออก,เหตุการณ์ที่ในไฟล์,คันที่,ภาพ1,ภาพ2,ภาพ3,ประเภทรถ,หมวดทะเบียน,เลข,จังหวัด,โฟลเดอร์\n';
-    let no=0;                                       // ลำดับเหตุการณ์ที่ส่งออก (นับทุกคัน)
+    let no=0;
     for(const [it,k,ci] of list){
       no++;
-      const e=it.events[k],c=e.cars[ci],p=c.plate,P=c.picks;
+      const e=it.events[k],c=pkCars(e)[ci],p=c.plate,P=c.picks;
       const v=await getV(it);
       const cdir=await root.getDirectoryHandle(safe(it.cat),{create:true});
       if(!vidDirs.has(it.id)){
@@ -2041,14 +2048,14 @@ async function pkExportAll(){
       const evDir=await vidDir.getDirectoryHandle(await uniqueName(vidDir,evLabel,'','dir'),{create:true});
 
       const names=[];
-      for(let si=0;si<PK_SLOTS.length;si++){
-        const [key,label]=PK_SLOTS[si];
+      for(let si=0;si<PK_STEPS.length;si++){
+        const {key,label}=PK_STEPS[si];
         const slot=si+1,crop=key==='p',t=P[key];
         expUI.set(done/total,`${evLabel} · ภาพ ${slot}/3`);
         const bmp=await getFrame(v,t);
-        const cv=pkCropCanvas(bmp,crop?carQ(e,c,t):null);   // ภาพ 3 ใช้กรอบของคันนี้
+        const cv=pkCropCanvas(bmp,crop?carQ(e,c,t):null);
         bmp.close();
-        // ภาพ 1-2: เซฟเฟรมเต็มความละเอียดเป็น PNG เสมอ / ภาพ 3: ครอปตามตัวเลือกคุณภาพ
+        // ภาพ 1-2: เฟรมเต็มความละเอียดเป็น PNG เสมอ / ภาพ 3: ครอปตามตัวเลือกคุณภาพ
         const blob=crop
           ? await canvasBlob(cv)
           : await new Promise(r=>cv.toBlob(r,'image/png'));
@@ -2071,34 +2078,27 @@ async function pkExportAll(){
     keepAlive(false);
   }
 }
-
-// ---------- ผูกปุ่มและคีย์ของแท็บ 4 ----------
-$('pkList').onclick=ev=>{const d=ev.target.closest('[data-pk]');if(!d)return;const [it,k,ci]=pkQueue[+d.dataset.pk];pkSelect(it.id,k,ci)};
-$('pkDone').onclick=pkDone;
-$('pkSkip').onclick=pkSkip;
 $('pkExport').onclick=pkExportAll;
-$('pkCat').onchange=renderPick;
-$('pkOnly').onchange=renderPick;
 
+// ---------- คีย์ลัด ----------
 document.addEventListener('keydown',ev=>{
-  // ถ้า modal เปิดอยู่ ให้ควบคุมด้วยคีย์บอร์ดของ modal
   if(pkM){
+    const tag=ev.target.tagName,isIn=/INPUT|TEXTAREA|SELECT/.test(tag);
     const big=ev.shiftKey?25:1;
-    if(ev.key==='Escape'){pkMClose();return}
-    if(ev.key==='Enter'){ev.preventDefault();pkMConfirm();return}
-    if(ev.key==='ArrowRight'){ev.preventDefault();pkMShow(pkM.t+RS*big);return}
-    if(ev.key==='ArrowLeft'){ev.preventDefault();pkMShow(pkM.t-RS*big);return}
+    if(ev.key==='Escape'){ev.preventDefault();pkClose();return}
+    if(tag==='BUTTON'&&(ev.key==='Enter'||ev.key===' '))return;   // ให้ปุ่มทำงานตามปกติ
+    if(ev.key==='Enter'){ev.preventDefault();pkSaveCar();return}
+    if(isIn)return;                                              // กำลังพิมพ์หรือลากแถบเลื่อน
+    if(ev.key==='ArrowRight'){ev.preventDefault();pkShow(pkM.t+RS*big)}
+    else if(ev.key==='ArrowLeft'){ev.preventDefault();pkShow(pkM.t-RS*big)}
+    else if(ev.key==='1'||ev.key==='2'||ev.key==='3')pkSwitchStep(+ev.key-1);
+    else if(ev.key===' '){ev.preventDefault();pkConfirmStep()}
     return;
   }
   if($('v-pick').hidden||!$('dlg').hidden)return;
-  if(/INPUT|SELECT|TEXTAREA|BUTTON/.test(ev.target.tagName))return;
-  const k=ev.key;
-  if(k==='Enter'){ev.preventDefault();pkDone()}
-  else if(k==='ArrowDown'||k==='ArrowUp'){
+  if(ev.key==='Enter'&&!/INPUT|SELECT|TEXTAREA|BUTTON/.test(ev.target.tagName)&&pkQueue.length){
     ev.preventDefault();
-    const idx=pkQueue.findIndex(([i2,k2,ci2])=>i2.id===pk.id&&k2===pk.k&&ci2===pk.ci);
-    const nx=pkQueue[idx+(k==='ArrowDown'?1:-1)];
-    if(nx)pkSelect(nx[0].id,nx[1],nx[2]);
+    const [it,k,ci]=pkQueue[0];pkOpen(it,k,ci);
   }
 });
   
