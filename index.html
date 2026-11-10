@@ -209,6 +209,8 @@ canvas{max-width:100%;display:block;background:#000;border-radius:8px}
       </div>
       <div class="bar big"><i id="ovBar"></i></div>
       <div id="ovT" class="mu" style="margin-bottom:12px"></div>
+      <div id="ovT" class="mu" style="margin-bottom:4px"></div>
+      <div id="ovTime" class="mu" style="margin-bottom:12px"></div>
       <div id="qlist"></div>
     </div>
 
@@ -503,7 +505,10 @@ const PROV='กรุงเทพมหานคร กระบี่ กาญ
 
 let items=[],uid=0,filterCat='all',running=false,stopF=false,hardStop=false,session=null,vcls=null,ocrW=null;
 let ocrBusy=false,ocrStopF=false;
-let RUN={total:0,doneN:0};
+let RUN={total:0,doneN:0,ids:new Set()};
+const TM={acc:0,t0:0};   // acc = เวลาที่ใช้ไปสะสม (ไม่นับช่วงพัก), t0 = เวลาที่เริ่มรอบนี้
+let TICK=null;
+const fmtHMS=s=>fmtT(s);  // ใช้รูปแบบ ชม:นาที:วินาที เดียวกับของเดิม
 let cats=JSON.parse(localStorage.uCats||'null')||['ทั่วไป'];
 let zonesAll=JSON.parse(localStorage.uZones||'{}');
 let REV={id:null,k:-1},fi=0,flat=[],showTok=0,plTok=0,lastType='',zk=null,zSample=null;
@@ -841,6 +846,37 @@ function prog(it,pct,info){
   $('ovT').textContent=`ไฟล์ ${RUN.doneN+1}/${RUN.total} · ${it.name}`;
 }
 
+// ---------- เวลารวมของทั้งรอบ ----------
+function tmNow(){return TM.acc+(TM.t0?(performance.now()-TM.t0)/1000:0)}
+function tmStart(){TM.t0=performance.now()}
+function tmStop(){if(TM.t0){TM.acc+=(performance.now()-TM.t0)/1000;TM.t0=0}}
+
+// ความคืบหน้ารวม 0–1 ถ่วงน้ำหนักด้วยความยาววิดีโอ
+function overallProgress(){
+  const list=items.filter(i=>RUN.ids.has(i.id));
+  const known=list.map(i=>i.dur).filter(d=>d>0);
+  const avg=known.length?known.reduce((a,b)=>a+b,0)/known.length:1;
+  let W=0,D=0;
+  for(const i of list){
+    const w=i.dur>0?i.dur:avg;
+    const p=(i.status==='done'||i.status==='err')?100:(i.pct||0);
+    W+=w;D+=w*p/100;
+  }
+  return W?D/W:0;
+}
+
+function renderTime(){
+  const el=$('ovTime');
+  if(!RUN.ids||!RUN.ids.size){el.textContent='';return}
+  const used=tmNow(),f=overallProgress();
+  const total=f>0.01?used/f:0;
+  const left=total?Math.max(0,total-used):0;
+  el.textContent=`เวลาทั้งหมดโดยประมาณ ${total?fmtHMS(total):'กำลังประเมิน…'}`
+    +` · ใช้ไปแล้ว ${fmtHMS(used)}`
+    +` · เหลืออีก ${total?fmtHMS(left):'กำลังประเมิน…'}`
+    +` · ความคืบหน้ารวม ${(f*100).toFixed(1)}%`;
+}  
+
 // ---------- OCR & จำแนกประเภท (ทำในแท็บ 4 เท่านั้น) ----------
 async function getOcr(){
   if(!ocrW){console.log('กำลังโหลด OCR…');ocrW=await withTO(Tesseract.createWorker('tha+eng'),60000,'โหลด OCR ไม่สำเร็จ');console.log('โหลด OCR เสร็จ')}
@@ -1107,12 +1143,19 @@ async function runQueue(cat){
   if(running)return;
   if(ocrBusy)return msg('กำลังอ่านทะเบียนอยู่ — รอให้เสร็จก่อน');
   if(!session)return msg('โมเดลตรวจรถยังไม่พร้อม — เลือกไฟล์ yolov8n.onnx ก่อน');
-  RUN={total:items.filter(i=>runnable(i,cat)).length,doneN:0};
+  const todo=items.filter(i=>runnable(i,cat));
+  RUN={total:todo.length,doneN:0,ids:new Set(todo.map(i=>i.id))};
   if(!RUN.total)return;
   keepAlive(true);
   running=true;stopF=false;hardStop=false;updBtns();
+  tmStart();
+  TICK=setInterval(renderTime,1000);   // อัปเดตทุกวินาที
+  renderTime();
   while(!stopF){const it=items.find(i=>runnable(i,cat));if(!it)break;await runOne(it)}
   running=false;keepAlive(false);
+  tmStop();
+  clearInterval(TICK);TICK=null;
+  renderTime();
   const left=items.filter(i=>runnable(i,cat)).length;
   $('ovT').textContent=hardStop?'หยุดแล้ว — ไฟล์นั้นจะเริ่มใหม่ตั้งแต่ต้น'
     :(stopF&&left)?'พักแล้ว — กด "ทำต่อ" เพื่อเริ่มจากจุดเดิม'
