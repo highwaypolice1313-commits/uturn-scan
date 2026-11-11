@@ -441,7 +441,7 @@ const BADGE={wait:'รอคิว',run:'กำลังทำ',done:'เสร�
 const withTO=(p,ms,msg)=>Promise.race([p,new Promise((_,j)=>setTimeout(()=>j(new Error(msg)),ms))]);
 
 const RS=0.04;          // ความละเอียดสูงสุด = 1 เฟรม (~25fps)
-const LOST=4;           // วินาทีที่หายจากเฟรมแล้วถือว่าการเคลื่อนที่จบ
+const LOST=8;           // วินาทีที่หายจากเฟรมแล้วถือว่าการเคลื่อนที่จบ
 const MINPTS=3;         // จำนวนจุดขั้นต่ำของการติดตามหนึ่งรายการ
 const evS=(it,e)=>e.ts;
 const evE=(it,e)=>e.te;
